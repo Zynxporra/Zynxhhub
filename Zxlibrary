@@ -522,35 +522,16 @@ function OrionLib:MakeWindow(WindowConfig)
 	local UIHidden = false
 
 	WindowConfig = WindowConfig or {}
-	local function colorfulText(text, palette)
-		local out = ""
-		for i = 1, #text do
-			local ch = text:sub(i, i)
-			local color = palette[((i - 1) % #palette) + 1]
-			out = out .. ('<font color="rgb(%d,%d,%d)">%s</font>'):format(color[1], color[2], color[3], ch)
-		end
-		return out
-	end
-
-	WindowConfig.Name = WindowConfig.Name or colorfulText("ZynxHub", {
-		{255, 92, 92},   -- red
-		{255, 165, 92},  -- orange
-		{255, 220, 92},  -- yellow
-		{92, 255, 168},  -- green
-		{92, 200, 255},  -- cyan
-		{140, 110, 255}, -- blue
-		{255, 92, 230}   -- magenta
-	})
+	WindowConfig.Name = WindowConfig.Name or "ZynxHub"
 	WindowConfig.ConfigFolder = WindowConfig.ConfigFolder or WindowConfig.Name
 	WindowConfig.SaveConfig = WindowConfig.SaveConfig or false
 	WindowConfig.HidePremium = WindowConfig.HidePremium or false
 	if WindowConfig.IntroEnabled == nil then
 		WindowConfig.IntroEnabled = true
 	end
-	WindowConfig.Name = WindowConfig.Name or '<font color="rgb(90,200,255)">ZynxHub</font>'
-	WindowConfig.IntroText = WindowConfig.IntroText or '<font color="rgba(90, 200, 255, 1)">ZynxHub</font> •'
+	WindowConfig.IntroText = WindowConfig.IntroText or "ZynxHub •"
 	WindowConfig.CloseCallback = WindowConfig.CloseCallback or function() end
-	WindowConfig.ShowIcon = (WindowConfig.ShowIcon == nil) and true or WindowConfig.ShowIcon
+	WindowConfig.ShowIcon = WindowConfig.ShowIcon or false
 	WindowConfig.Icon = WindowConfig.Icon or "rbxassetid://8834748103"
 	WindowConfig.IntroIcon = WindowConfig.IntroIcon or "rbxassetid://8834748103"
 	OrionLib.Folder = WindowConfig.ConfigFolder
