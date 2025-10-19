@@ -529,9 +529,10 @@ function OrionLib:MakeWindow(WindowConfig)
 	if WindowConfig.IntroEnabled == nil then
 		WindowConfig.IntroEnabled = true
 	end
-	WindowConfig.IntroText = WindowConfig.IntroText or "ZynxHub •"
+	WindowConfig.Name = WindowConfig.Name or '<font color="rgb(90,200,255)">ZynxHub</font>'
+	WindowConfig.IntroText = WindowConfig.IntroText or '<font color="rgb(90,200,255)">ZynxHub</font> •'
 	WindowConfig.CloseCallback = WindowConfig.CloseCallback or function() end
-	WindowConfig.ShowIcon = WindowConfig.ShowIcon or false
+	WindowConfig.ShowIcon = (WindowConfig.ShowIcon == nil) and true or WindowConfig.ShowIcon
 	WindowConfig.Icon = WindowConfig.Icon or "rbxassetid://8834748103"
 	WindowConfig.IntroIcon = WindowConfig.IntroIcon or "rbxassetid://8834748103"
 	OrionLib.Folder = WindowConfig.ConfigFolder
