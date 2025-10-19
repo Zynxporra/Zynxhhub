@@ -530,7 +530,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		WindowConfig.IntroEnabled = true
 	end
 	WindowConfig.Name = WindowConfig.Name or '<font color="rgb(90,200,255)">ZynxHub</font>'
-	WindowConfig.IntroText = WindowConfig.IntroText or '<font color="rgb(90,200,255)">ZynxHub</font> •'
+	WindowConfig.IntroText = WindowConfig.IntroText or '<font color="rgba(90, 200, 255, 1)">ZynxHub</font> •'
 	WindowConfig.CloseCallback = WindowConfig.CloseCallback or function() end
 	WindowConfig.ShowIcon = (WindowConfig.ShowIcon == nil) and true or WindowConfig.ShowIcon
 	WindowConfig.Icon = WindowConfig.Icon or "rbxassetid://8834748103"
@@ -698,6 +698,39 @@ function OrionLib:MakeWindow(WindowConfig)
 	end	
 
 	AddDraggingFunctionality(DragPoint, MainWindow)
+
+	-- RGB color cycling (automatic rainbow theme)
+	-- Velocidade pode ser ajustada passando WindowConfig.RGBSpeed (padrão 0.2)
+	WindowConfig.RGBEnabled = (WindowConfig.RGBEnabled == nil) and true or WindowConfig.RGBEnabled
+	WindowConfig.RGBSpeed = WindowConfig.RGBSpeed or 0.2
+
+	if WindowConfig.RGBEnabled then
+		local hue = 0
+		AddConnection(RunService.RenderStepped, function(dt)
+			-- avança a hue com base em dt e velocidade
+			hue = (hue + dt * WindowConfig.RGBSpeed) % 1
+
+			-- cria variações de cores para diferentes partes do tema
+			local mainC     = Color3.fromHSV(hue, 0.85, 0.95)
+			local secondC   = Color3.fromHSV((hue + 0.12) % 1, 0.75, 0.9)
+			local strokeC   = Color3.fromHSV((hue + 0.24) % 1, 0.6, 0.85)
+			local dividerC  = Color3.fromHSV((hue + 0.36) % 1, 0.5, 0.8)
+			local textC     = Color3.fromHSV((hue + 0.5) % 1, 0.95, 1)
+			local textDarkC = Color3.fromHSV((hue + 0.6) % 1, 0.6, 0.9)
+
+			-- aplica nas definições do tema selecionado e atualiza UI
+			local theme = OrionLib.Themes[OrionLib.SelectedTheme]
+			if theme then
+				theme.Main = mainC
+				theme.Second = secondC
+				theme.Stroke = strokeC
+				theme.Divider = dividerC
+				theme.Text = textC
+				theme.TextDark = textDarkC
+				SetTheme()
+			end
+		end)
+	end
 
 AddConnection(CloseBtn.MouseButton1Up, function()
 userInputService.MouseIconEnabled = false
