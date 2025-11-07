@@ -75,9 +75,17 @@ local OrionLib = {
 	Text = Color3.fromRGB(255, 255, 255),
 	TextDark = Color3.fromRGB(200, 200, 200)
 }
+Blackout = {
+    Main = Color3.fromRGB(0, 0, 0),
+    Second = Color3.fromRGB(10, 10, 10),
+    Stroke = Color3.fromRGB(40, 40, 40),
+    Divider = Color3.fromRGB(40, 40, 40),
+    Text = Color3.fromRGB(255, 255, 255),
+    TextDark = Color3.fromRGB(150, 150, 150)
+},
 
 	},
-	SelectedTheme = "Space",
+	SelectedTheme = "Moon",
 	Folder = nil,
 	SaveCfg = false
 }
