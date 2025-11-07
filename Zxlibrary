@@ -84,7 +84,7 @@ local OrionLib = {
         },
     },
 
-    SelectedTheme = "Blackout",
+    SelectedTheme = "Moon",
     Folder = nil,
     SaveCfg = false
 }
