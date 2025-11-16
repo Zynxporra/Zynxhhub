@@ -4,7 +4,6 @@ end
 
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local Players = game:GetService("Players")
 
 local OrionLib = {
     Elements = {},
@@ -54,18 +53,9 @@ local function makeText(parent, text, size, color, bold, align)
     return t
 end
 
-local function makeIcon(parent, assetId)
-    local img = Instance.new("ImageLabel")
-    img.BackgroundTransparency = 1
-    img.Size = UDim2.new(0, 20, 0, 20)
-    img.Image = assetId or ""
-    img.Parent = parent
-    return img
-end
-
-local function draggable(header, root)
+local function draggable(handle, root)
     local dragging, dragInput, mousePos, framePos = false, nil, nil, nil
-    header.InputBegan:Connect(function(input)
+    handle.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             mousePos = input.Position
@@ -77,7 +67,7 @@ local function draggable(header, root)
             end)
         end
     end)
-    header.InputChanged:Connect(function(input)
+    handle.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement then
             dragInput = input
         end
@@ -115,11 +105,6 @@ function OrionLib:MakeWindow(opts)
     title.Position = UDim2.new(0, 14, 0, 14)
     title.Size = UDim2.new(1, -120, 0, 20)
 
-    if opts and opts.Icon then
-        local ic = makeIcon(header, opts.Icon)
-        ic.Position = UDim2.new(0, 90, 0, 14)
-    end
-
     local close = Instance.new("TextButton")
     close.BackgroundColor3 = theme.Second
     close.Size = UDim2.new(0, 36, 0, 30)
@@ -132,10 +117,21 @@ function OrionLib:MakeWindow(opts)
     styleButton(close, 8)
     close.MouseButton1Click:Connect(function()
         if opts and opts.CloseCallback then opts.CloseCallback() end
-        gui:Destroy()
+        gui.Enabled = false
     end)
 
-    draggable(header, root)
+    local isVisible = true
+    table.insert(OrionLib.Connections, UserInputService.InputBegan:Connect(function(input, gp)
+        if gp then return end
+        if input.KeyCode == Enum.KeyCode.M then
+            isVisible = not isVisible
+            gui.Enabled = isVisible
+            root.Visible = isVisible
+            if isVisible then
+                root.Position = UDim2.new(0.5, -310, 0.5, -210)
+            end
+        end
+    end))
 
     local sidebar = Instance.new("Frame")
     sidebar.BackgroundColor3 = theme.Second
@@ -161,6 +157,10 @@ function OrionLib:MakeWindow(opts)
     content.Position = UDim2.new(0, 188, 0, 64)
     content.Parent = root
     styleFrame(content, 12)
+
+    draggable(header, root)
+    draggable(sidebar, root)
+    draggable(content, root)
 
     local pages = Instance.new("Folder")
     pages.Name = "Pages"
@@ -524,11 +524,7 @@ function OrionLib:MakeWindow(opts)
 
     function OrionLib:Init() end
 
-    local WindowAPI = {}
-    setmetatable(WindowAPI, {__index = {
-        MakeTab = function(_, ...) return window:MakeTab(...) end
-    }})
-    return WindowAPI
+    return window
 end
 
 return OrionLib
