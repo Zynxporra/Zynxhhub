@@ -1,4 +1,7 @@
--- lua | Untitled-2
+if not getgenv().gethui then
+    getgenv().gethui = function() return game:GetService("CoreGui") end
+end
+
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -17,12 +20,14 @@ local OrionLib = {
             TextDark = Color3.fromRGB(180, 180, 180)
         }
     },
-    SelectedTheme = "SleekRed"
+    SelectedTheme = "SleekRed",
+    SaveCfg = false,
+    Folder = nil
 }
 
-local function styleFrame(f)
+local function styleFrame(f, corner)
     local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 12)
+    c.CornerRadius = UDim.new(0, corner or 12)
     c.Parent = f
     local s = Instance.new("UIStroke")
     s.Thickness = 2
@@ -31,71 +36,113 @@ local function styleFrame(f)
     s.Parent = f
 end
 
-local function styleButton(b)
+local function styleButton(b, corner)
     local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 10)
+    c.CornerRadius = UDim.new(0, corner or 10)
     c.Parent = b
 end
 
-local function makeText(parent, text, size, color, bold)
+local function makeText(parent, text, size, color, bold, align)
     local t = Instance.new("TextLabel")
     t.BackgroundTransparency = 1
     t.Text = text or ""
     t.Font = bold and Enum.Font.GothamBold or Enum.Font.Gotham
     t.TextSize = size or 14
     t.TextColor3 = color or OrionLib.Themes[OrionLib.SelectedTheme].Text
-    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.TextXAlignment = align or Enum.TextXAlignment.Left
     t.Parent = parent
     return t
 end
 
+local function makeIcon(parent, assetId)
+    local img = Instance.new("ImageLabel")
+    img.BackgroundTransparency = 1
+    img.Size = UDim2.new(0, 20, 0, 20)
+    img.Image = assetId or ""
+    img.Parent = parent
+    return img
+end
+
+local function draggable(header, root)
+    local dragging, dragInput, mousePos, framePos = false, nil, nil, nil
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            mousePos = input.Position
+            framePos = root.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    header.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - mousePos
+            root.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
 function OrionLib:MakeWindow(opts)
+    local theme = OrionLib.Themes[OrionLib.SelectedTheme]
     local gui = Instance.new("ScreenGui")
     gui.Name = "Orion"
     if syn then syn.protect_gui(gui) end
-    gui.Parent = gethui and gethui() or game:GetService("CoreGui")
-
-    local theme = OrionLib.Themes[OrionLib.SelectedTheme]
+    gui.Parent = gethui() or game:GetService("CoreGui")
 
     local root = Instance.new("Frame")
     root.BackgroundColor3 = theme.Main
-    root.Size = UDim2.new(0, 560, 0, 380)
-    root.Position = UDim2.new(0.5, -280, 0.5, -190)
+    root.Size = UDim2.new(0, 620, 0, 420)
+    root.Position = UDim2.new(0.5, -310, 0.5, -210)
     root.Parent = gui
-    styleFrame(root)
+    styleFrame(root, 14)
 
     local header = Instance.new("Frame")
     header.BackgroundColor3 = theme.Second
-    header.Size = UDim2.new(1, -16, 0, 44)
+    header.Size = UDim2.new(1, -16, 0, 48)
     header.Position = UDim2.new(0, 8, 0, 8)
     header.Parent = root
-    styleFrame(header)
+    styleFrame(header, 12)
 
     local title = makeText(header, (opts and opts.Name) or "Orion", 16, theme.Text, true)
-    title.Position = UDim2.new(0, 12, 0, 12)
-    title.Size = UDim2.new(1, -80, 1, -24)
+    title.Position = UDim2.new(0, 14, 0, 14)
+    title.Size = UDim2.new(1, -120, 0, 20)
+
+    if opts and opts.Icon then
+        local ic = makeIcon(header, opts.Icon)
+        ic.Position = UDim2.new(0, 90, 0, 14)
+    end
 
     local close = Instance.new("TextButton")
     close.BackgroundColor3 = theme.Second
-    close.Size = UDim2.new(0, 36, 0, 28)
-    close.Position = UDim2.new(1, -44, 0, 8)
+    close.Size = UDim2.new(0, 36, 0, 30)
+    close.Position = UDim2.new(1, -44, 0, 9)
     close.Text = "×"
     close.TextColor3 = theme.Text
-    close.TextSize = 18
+    close.TextSize = 20
+    close.Font = Enum.Font.GothamBold
     close.Parent = header
-    styleButton(close)
-
+    styleButton(close, 8)
     close.MouseButton1Click:Connect(function()
         if opts and opts.CloseCallback then opts.CloseCallback() end
         gui:Destroy()
     end)
 
+    draggable(header, root)
+
     local sidebar = Instance.new("Frame")
     sidebar.BackgroundColor3 = theme.Second
-    sidebar.Size = UDim2.new(0, 160, 1, -68)
-    sidebar.Position = UDim2.new(0, 8, 0, 60)
+    sidebar.Size = UDim2.new(0, 180, 1, -72)
+    sidebar.Position = UDim2.new(0, 8, 0, 64)
     sidebar.Parent = root
-    styleFrame(sidebar)
+    styleFrame(sidebar, 12)
 
     local tabList = Instance.new("ScrollingFrame")
     tabList.BackgroundTransparency = 1
@@ -105,15 +152,15 @@ function OrionLib:MakeWindow(opts)
     tabList.ScrollBarThickness = 6
     tabList.Parent = sidebar
     local tabLayout = Instance.new("UIListLayout")
-    tabLayout.Padding = UDim.new(0, 6)
+    tabLayout.Padding = UDim.new(0, 8)
     tabLayout.Parent = tabList
 
     local content = Instance.new("Frame")
     content.BackgroundColor3 = theme.Second
-    content.Size = UDim2.new(1, -176, 1, -68)
-    content.Position = UDim2.new(0, 168, 0, 60)
+    content.Size = UDim2.new(1, -196, 1, -72)
+    content.Position = UDim2.new(0, 188, 0, 64)
     content.Parent = root
-    styleFrame(content)
+    styleFrame(content, 12)
 
     local pages = Instance.new("Folder")
     pages.Name = "Pages"
@@ -124,13 +171,13 @@ function OrionLib:MakeWindow(opts)
     function window:MakeTab(topts)
         local btn = Instance.new("TextButton")
         btn.BackgroundColor3 = theme.Main
-        btn.Size = UDim2.new(1, -10, 0, 36)
+        btn.Size = UDim2.new(1, -10, 0, 38)
         btn.Text = topts and topts.Name or "Tab"
         btn.TextColor3 = theme.Text
         btn.TextSize = 14
         btn.Font = Enum.Font.GothamSemibold
         btn.Parent = tabList
-        styleButton(btn)
+        styleButton(btn, 10)
 
         local page = Instance.new("Frame")
         page.BackgroundTransparency = 1
@@ -154,16 +201,16 @@ function OrionLib:MakeWindow(opts)
         function tab:AddSection(sopts)
             local sec = Instance.new("Frame")
             sec.BackgroundColor3 = theme.Main
-            sec.Size = UDim2.new(1, -10, 0, 56)
+            sec.Size = UDim2.new(1, 0, 0, 64)
             sec.Parent = page
-            styleFrame(sec)
+            styleFrame(sec, 10)
             local name = makeText(sec, (sopts and sopts.Name) or "Section", 14, theme.Text, true)
             name.Position = UDim2.new(0, 12, 0, 10)
             name.Size = UDim2.new(1, -24, 0, 20)
             local body = Instance.new("Frame")
             body.BackgroundTransparency = 1
-            body.Size = UDim2.new(1, -24, 0, 20)
-            body.Position = UDim2.new(0, 12, 0, 28)
+            body.Size = UDim2.new(1, -24, 0, 26)
+            body.Position = UDim2.new(0, 12, 0, 34)
             body.Parent = sec
             local bodyList = Instance.new("UIListLayout")
             bodyList.FillDirection = Enum.FillDirection.Horizontal
@@ -175,9 +222,9 @@ function OrionLib:MakeWindow(opts)
         function tab:AddLabel(text)
             local holder = Instance.new("Frame")
             holder.BackgroundColor3 = theme.Main
-            holder.Size = UDim2.new(1, -10, 0, 42)
+            holder.Size = UDim2.new(1, 0, 0, 42)
             holder.Parent = page
-            styleFrame(holder)
+            styleFrame(holder, 10)
             local l = makeText(holder, text or "Label", 14, theme.Text, false)
             l.Position = UDim2.new(0, 12, 0, 12)
             l.Size = UDim2.new(1, -24, 0, 18)
@@ -187,15 +234,15 @@ function OrionLib:MakeWindow(opts)
         function tab:AddParagraph(title, text)
             local holder = Instance.new("Frame")
             holder.BackgroundColor3 = theme.Main
-            holder.Size = UDim2.new(1, -10, 0, 90)
+            holder.Size = UDim2.new(1, 0, 0, 98)
             holder.Parent = page
-            styleFrame(holder)
+            styleFrame(holder, 10)
             local t = makeText(holder, title or "Paragraph", 14, theme.Text, true)
             t.Position = UDim2.new(0, 12, 0, 10)
             t.Size = UDim2.new(1, -24, 0, 20)
             local b = makeText(holder, text or "", 13, theme.TextDark, false)
-            b.Position = UDim2.new(0, 12, 0, 34)
-            b.Size = UDim2.new(1, -24, 0, 46)
+            b.Position = UDim2.new(0, 12, 0, 36)
+            b.Size = UDim2.new(1, -24, 0, 52)
             b.TextWrapped = true
             return {Set=function(nt, nb) t.Text = nt; b.Text = nb end}
         end
@@ -203,19 +250,19 @@ function OrionLib:MakeWindow(opts)
         function tab:AddButton(bopts)
             local holder = Instance.new("Frame")
             holder.BackgroundColor3 = theme.Main
-            holder.Size = UDim2.new(1, -10, 0, 42)
+            holder.Size = UDim2.new(1, 0, 0, 46)
             holder.Parent = page
-            styleFrame(holder)
+            styleFrame(holder, 10)
             local btn = Instance.new("TextButton")
             btn.BackgroundColor3 = theme.Second
-            btn.Size = UDim2.new(0, 140, 0, 28)
-            btn.Position = UDim2.new(0, 12, 0, 7)
+            btn.Size = UDim2.new(0, 160, 0, 30)
+            btn.Position = UDim2.new(0, 12, 0, 8)
             btn.Text = (bopts and bopts.Name) or "Button"
             btn.TextSize = 14
             btn.TextColor3 = theme.Text
             btn.Font = Enum.Font.GothamSemibold
             btn.Parent = holder
-            styleButton(btn)
+            styleButton(btn, 8)
             btn.MouseButton1Click:Connect(function()
                 if bopts and bopts.Callback then bopts.Callback() end
             end)
@@ -225,28 +272,28 @@ function OrionLib:MakeWindow(opts)
         function tab:AddToggle(topts)
             local holder = Instance.new("Frame")
             holder.BackgroundColor3 = theme.Main
-            holder.Size = UDim2.new(1, -10, 0, 42)
+            holder.Size = UDim2.new(1, 0, 0, 46)
             holder.Parent = page
-            styleFrame(holder)
+            styleFrame(holder, 10)
             local name = makeText(holder, (topts and topts.Name) or "Toggle", 14, theme.Text, false)
-            name.Position = UDim2.new(0, 12, 0, 12)
+            name.Position = UDim2.new(0, 12, 0, 14)
             name.Size = UDim2.new(1, -120, 0, 18)
             local switch = Instance.new("Frame")
             switch.BackgroundColor3 = theme.Second
-            switch.Size = UDim2.new(0, 52, 0, 26)
-            switch.Position = UDim2.new(1, -68, 0, 8)
+            switch.Size = UDim2.new(0, 56, 0, 28)
+            switch.Position = UDim2.new(1, -72, 0, 9)
             switch.Parent = holder
-            styleButton(switch)
+            styleButton(switch, 12)
             local knob = Instance.new("Frame")
             knob.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-            knob.Size = UDim2.new(0, 22, 0, 22)
+            knob.Size = UDim2.new(0, 24, 0, 24)
             knob.Position = UDim2.new(0, 2, 0, 2)
             knob.Parent = switch
             local kc = Instance.new("UICorner") kc.CornerRadius = UDim.new(1,0) kc.Parent = knob
             local state = topts and topts.Default or false
             local function set(v)
                 state = v
-                local x = v and 28 or 2
+                local x = v and 30 or 2
                 local col = v and theme.Stroke or Color3.fromRGB(200,200,200)
                 TweenService:Create(knob, TweenInfo.new(0.18, Enum.EasingStyle.Quint), {Position = UDim2.new(0, x, 0, 2), BackgroundColor3 = col}):Play()
                 if topts and topts.Flag then OrionLib.Flags[topts.Flag] = {Value = v} end
@@ -260,20 +307,20 @@ function OrionLib:MakeWindow(opts)
         function tab:AddSlider(sopts)
             local holder = Instance.new("Frame")
             holder.BackgroundColor3 = theme.Main
-            holder.Size = UDim2.new(1, -10, 0, 60)
+            holder.Size = UDim2.new(1, 0, 0, 66)
             holder.Parent = page
-            styleFrame(holder)
+            styleFrame(holder, 10)
             local name = makeText(holder, (sopts and sopts.Name) or "Slider", 14, theme.Text, false)
             name.Position = UDim2.new(0, 12, 0, 10)
             name.Size = UDim2.new(1, -24, 0, 18)
             local bar = Instance.new("Frame")
             bar.BackgroundColor3 = theme.Second
-            bar.Size = UDim2.new(1, -24, 0, 10)
-            bar.Position = UDim2.new(0, 12, 0, 40)
+            bar.Size = UDim2.new(1, -24, 0, 12)
+            bar.Position = UDim2.new(0, 12, 0, 42)
             bar.Parent = holder
-            styleButton(bar)
+            styleButton(bar, 8)
             local fill = Instance.new("Frame")
-            fill.BackgroundColor3 = sopts and sopts.Color or OrionLib.Themes[OrionLib.SelectedTheme].Stroke
+            fill.BackgroundColor3 = sopts and sopts.Color or theme.Stroke
             fill.Size = UDim2.new(0, 0, 1, 0)
             fill.Parent = bar
             local min = (sopts and sopts.Min) or 0
@@ -283,6 +330,7 @@ function OrionLib:MakeWindow(opts)
                 val = math.clamp(v, min, max)
                 local pct = (val - min) / (max - min)
                 fill.Size = UDim2.new(pct, 0, 1, 0)
+                if sopts and sopts.Flag then OrionLib.Flags[sopts.Flag] = {Value = val} end
                 if sopts and sopts.Callback then sopts.Callback(val) end
             end
             set(val)
@@ -306,18 +354,18 @@ function OrionLib:MakeWindow(opts)
         function tab:AddColorpicker(copts)
             local holder = Instance.new("Frame")
             holder.BackgroundColor3 = theme.Main
-            holder.Size = UDim2.new(1, -10, 0, 60)
+            holder.Size = UDim2.new(1, 0, 0, 66)
             holder.Parent = page
-            styleFrame(holder)
+            styleFrame(holder, 10)
             local name = makeText(holder, (copts and copts.Name) or "Color", 14, theme.Text, false)
             name.Position = UDim2.new(0, 12, 0, 10)
             name.Size = UDim2.new(1, -24, 0, 18)
             local bar = Instance.new("Frame")
             bar.BackgroundColor3 = theme.Second
-            bar.Size = UDim2.new(1, -24, 0, 10)
-            bar.Position = UDim2.new(0, 12, 0, 40)
+            bar.Size = UDim2.new(1, -24, 0, 12)
+            bar.Position = UDim2.new(0, 12, 0, 42)
             bar.Parent = holder
-            styleButton(bar)
+            styleButton(bar, 8)
             local grad = Instance.new("UIGradient")
             grad.Color = ColorSequence.new({
                 ColorSequenceKeypoint.new(0, Color3.fromHSV(0,1,1)),
@@ -330,7 +378,11 @@ function OrionLib:MakeWindow(opts)
             })
             grad.Parent = bar
             local current = (copts and copts.Default) or Color3.fromRGB(255,0,0)
-            local function send(c) if copts and copts.Callback then copts.Callback(c) end end
+            local function send(c)
+                current = c
+                if copts and copts.Flag then OrionLib.Flags[copts.Flag] = {Value = c} end
+                if copts and copts.Callback then copts.Callback(c) end
+            end
             send(current)
             bar.InputBegan:Connect(function(i)
                 if i.UserInputType==Enum.UserInputType.MouseButton1 then
@@ -354,30 +406,38 @@ function OrionLib:MakeWindow(opts)
         function tab:AddDropdown(dopts)
             local holder = Instance.new("Frame")
             holder.BackgroundColor3 = theme.Main
-            holder.Size = UDim2.new(1, -10, 0, 42)
+            holder.Size = UDim2.new(1, 0, 0, 46)
             holder.Parent = page
-            styleFrame(holder)
+            styleFrame(holder, 10)
             local btn = Instance.new("TextButton")
             btn.BackgroundColor3 = theme.Second
-            btn.Size = UDim2.new(1, -24, 0, 28)
-            btn.Position = UDim2.new(0, 12, 0, 7)
+            btn.Size = UDim2.new(1, -24, 0, 30)
+            btn.Position = UDim2.new(0, 12, 0, 8)
             btn.Text = (dopts and dopts.Default) or (dopts and dopts.Name) or "Dropdown"
             btn.TextSize = 14
             btn.TextColor3 = theme.Text
             btn.Font = Enum.Font.GothamSemibold
             btn.Parent = holder
-            styleButton(btn)
+            styleButton(btn, 8)
             local list = Instance.new("Frame")
             list.BackgroundColor3 = theme.Second
             list.Size = UDim2.new(1, -24, 0, 0)
-            list.Position = UDim2.new(0, 12, 0, 42)
+            list.Position = UDim2.new(0, 12, 0, 46)
             list.Visible = false
             list.Parent = holder
-            styleFrame(list)
+            styleFrame(list, 10)
             local l = Instance.new("UIListLayout")
             l.Padding = UDim.new(0, 6)
             l.Parent = list
             local open = false
+            local function pick(o)
+                btn.Text = o
+                if dopts and dopts.Flag then OrionLib.Flags[dopts.Flag] = {Value = o} end
+                if dopts and dopts.Callback then dopts.Callback(o) end
+                open = false
+                list.Visible = false
+                list.Size = UDim2.new(1, -24, 0, 0)
+            end
             local function populate(opts)
                 for _, c in ipairs(list:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
                 for _, o in ipairs(opts or {}) do
@@ -389,14 +449,8 @@ function OrionLib:MakeWindow(opts)
                     it.TextSize = 13
                     it.Font = Enum.Font.Gotham
                     it.Parent = list
-                    styleButton(it)
-                    it.MouseButton1Click:Connect(function()
-                        btn.Text = o
-                        if dopts and dopts.Callback then dopts.Callback(o) end
-                        open = false
-                        list.Visible = false
-                        list.Size = UDim2.new(1, -24, 0, 0)
-                    end)
+                    styleButton(it, 8)
+                    it.MouseButton1Click:Connect(function() pick(o) end)
                 end
                 list.Size = UDim2.new(1, -24, 0, #((opts or {})) * 34 + 8)
             end
@@ -411,21 +465,22 @@ function OrionLib:MakeWindow(opts)
         function tab:AddTextbox(xopts)
             local holder = Instance.new("Frame")
             holder.BackgroundColor3 = theme.Main
-            holder.Size = UDim2.new(1, -10, 0, 42)
+            holder.Size = UDim2.new(1, 0, 0, 46)
             holder.Parent = page
-            styleFrame(holder)
+            styleFrame(holder, 10)
             local box = Instance.new("TextBox")
             box.BackgroundColor3 = theme.Second
-            box.Size = UDim2.new(1, -24, 0, 28)
-            box.Position = UDim2.new(0, 12, 0, 7)
+            box.Size = UDim2.new(1, -24, 0, 30)
+            box.Position = UDim2.new(0, 12, 0, 8)
             box.Text = (xopts and xopts.Default) or ""
             box.TextColor3 = theme.Text
             box.TextSize = 14
             box.ClearTextOnFocus = xopts and xopts.TextDisappear or false
             box.Font = Enum.Font.Gotham
             box.Parent = holder
-            styleButton(box)
+            styleButton(box, 8)
             box.FocusLost:Connect(function()
+                if xopts and xopts.Flag then OrionLib.Flags[xopts.Flag] = {Value = box.Text} end
                 if xopts and xopts.Callback then xopts.Callback(box.Text) end
             end)
             return {Set=function(v) box.Text = v end}
@@ -445,18 +500,19 @@ function OrionLib:MakeWindow(opts)
     end
 
     function OrionLib:MakeNotification(n)
+        local theme = OrionLib.Themes[OrionLib.SelectedTheme]
         local holder = Instance.new("Frame")
         holder.BackgroundColor3 = theme.Main
-        holder.Size = UDim2.new(0, 260, 0, 64)
-        holder.Position = UDim2.new(1, -268, 0, 60)
+        holder.Size = UDim2.new(0, 280, 0, 70)
+        holder.Position = UDim2.new(1, -288, 0, 64)
         holder.Parent = root
-        styleFrame(holder)
+        styleFrame(holder, 10)
         local t = makeText(holder, n and n.Name or "Info", 14, theme.Text, true)
-        t.Position = UDim2.new(0, 12, 0, 8)
-        t.Size = UDim2.new(1, -24, 0, 18)
+        t.Position = UDim2.new(0, 12, 0, 10)
+        t.Size = UDim2.new(1, -24, 0, 20)
         local b = makeText(holder, n and n.Content or "", 13, theme.TextDark, false)
-        b.Position = UDim2.new(0, 12, 0, 30)
-        b.Size = UDim2.new(1, -24, 0, 26)
+        b.Position = UDim2.new(0, 12, 0, 34)
+        b.Size = UDim2.new(1, -24, 0, 28)
         b.TextWrapped = true
         local dur = (n and n.Time) or 3
         task.delay(dur, function()
@@ -468,7 +524,11 @@ function OrionLib:MakeWindow(opts)
 
     function OrionLib:Init() end
 
-    return {MakeTab = (function(...) return nil end), root = root, sidebar = sidebar, content = content, MakeTab = function(self,...) return self:MakeTab(...) end}
+    local WindowAPI = {}
+    setmetatable(WindowAPI, {__index = {
+        MakeTab = function(_, ...) return window:MakeTab(...) end
+    }})
+    return WindowAPI
 end
 
 return OrionLib
