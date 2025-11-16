@@ -85,20 +85,20 @@ local OrionLib = {
         },
     },
 
-    SelectedTheme = "Blackout",
-    Folder = nil,
-    SaveCfg = false
+SelectedTheme = "Blackout",
+Folder = nil,
+SaveCfg = false
 }
 
-local Icons = {}
-
-local Success, Response = pcall(function()
-	Icons = HttpService:JSONDecode(game:HttpGetAsync("https://raw.githubusercontent.com/evoincorp/lucideblox/master/src/modules/util/icons.json")).icons
-end)
-
-if not Success then
-	warn("\nOrion Library - Executede! : " .. Response .. "\n")
-end	
+local Icons = {
+	loopplayer = "rbxassetid://121650267950827",
+	teleport = "rbxassetid://6723742959",
+	player = "rbxassetid://124871982298256",
+	config = "rbxassetid://99581296648152",
+	grab = "rbxassetid://6289035084",
+	esp = "rbxassetid://13321848342",
+	bring = "rbxassetid://129910036187186",
+}
 
 local function GetIcon(IconName)
 	if Icons[IconName] ~= nil then
@@ -106,7 +106,7 @@ local function GetIcon(IconName)
 	else
 		return nil
 	end
-end   
+end
 
 local Orion = Instance.new("ScreenGui")
 Orion.Name = "Orion"
