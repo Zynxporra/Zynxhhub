@@ -1,3 +1,4 @@
+
 getgenv().gethui = function() return game.CoreGui end
 local success, result = pcall(function()
     return _G.firsttimeinjection
@@ -89,18 +90,15 @@ SelectedTheme = "Blackout",
 Folder = nil,
 SaveCfg = false
 }
-
 local Icons = {}
 
 local Success, Response = pcall(function()
-	Icons = HttpService:JSONDecode(game:HttpGetAsync(
-		"https://raw.githubusercontent.com/evoincorp/lucideblox/master/src/modules/util/icons.json"
-	)).icons
+	Icons = HttpService:JSONDecode(game:HttpGetAsync("https://raw.githubusercontent.com/evoincorp/lucideblox/master/src/modules/util/icons.json")).icons
 end)
 
 if not Success then
-	warn("\nOrion Library - Executed! : " .. Response .. "\n")
-end
+	warn("\nOrion Library - Failed to load Feather Icons. Error code: " .. Response .. "\n")
+end	
 
 local function GetIcon(IconName)
 	if Icons[IconName] ~= nil then
@@ -108,7 +106,7 @@ local function GetIcon(IconName)
 	else
 		return nil
 	end
-end
+end   
 
 local Orion = Instance.new("ScreenGui")
 Orion.Name = "Orion"
