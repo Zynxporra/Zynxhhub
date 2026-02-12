@@ -149,12 +149,12 @@ local OrionLib = {
 	ThemeObjects = {},
 	Themes = {
 		Default = {
-			Main = Color3.fromRGB(0, 0, 0),       -- fundo principal preto
-			Second = Color3.fromRGB(30, 30, 30),  -- fundo secundário cinza escuro
-			Stroke = Color3.fromRGB(80, 80, 80),  -- bordas cinza
-			Divider = Color3.fromRGB(80, 80, 80), -- divisores cinza
-			Text = Color3.fromRGB(255, 255, 255), -- texto branco
-			TextDark = Color3.fromRGB(150, 150, 150) -- texto cinza
+			Main = Color3.fromRGB(10, 10, 10),       -- fundo preto escuro
+			Second = Color3.fromRGB(25, 10, 35),     -- fundo secundário roxo escuro
+			Stroke = Color3.fromRGB(120, 80, 200),   -- bordas roxo claro
+			Divider = Color3.fromRGB(120, 80, 200),  -- divisores roxo claro
+			Text = Color3.fromRGB(200, 180, 255),    -- texto roxo claro
+			TextDark = Color3.fromRGB(150, 120, 220) -- texto roxo escuro
 		}
 	},
 	SelectedTheme = "Default",
@@ -162,6 +162,7 @@ local OrionLib = {
 	SaveCfg = false,
 	CurrentLanguage = "en"
 }
+
 
 -- ═══════════════════════════════════════════════════════════════
 --  CONNECTION MANAGEMENT - Gerenciamento de conexões
