@@ -141,7 +141,6 @@ else
 		end
 	end
 end
-
 -- ═══════════════════════════════════════════════════════════════
 --  ORIONLIB INITIALIZATION - Inicialização da biblioteca
 -- ═══════════════════════════════════════════════════════════════
@@ -152,12 +151,21 @@ local OrionLib = {
 	ThemeObjects = {},
 	Themes = {
 		Default = {
-			Main = Color3.fromRGB(25, 25, 25),
-			Second = Color3.fromRGB(32, 32, 32),
-			Stroke = Color3.fromRGB(60, 60, 60),
-			Divider = Color3.fromRGB(60, 60, 60),
-			Text = Color3.fromRGB(240, 240, 240),
-			TextDark = Color3.fromRGB(150, 150, 150)
+			Main = Color3.fromRGB(40, 5, 5),      -- Roxo escuro principal
+			Second = Color3.fromRGB(55, 5, 7),    -- Roxo médio
+			Stroke = Color3.fromRGB(150, 5, 2),  -- Roxo claro para bordas
+			Divider = Color3.fromRGB(90, 5, 1),  -- Roxo médio-escuro
+			Text = Color3.fromRGB(240, 5, 2),   -- Texto branco
+			TextDark = Color3.fromRGB(200, 5, 2),
+
+			-- 🌌 Gradient do fundo
+			MainGradient = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 0, 40)),
+				ColorSequenceKeypoint.new(0.5, Color3.fromRGB(60, 20, 80)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 40, 160))
+			},
+
+			GradientRotation = 135
 		}
 	},
 	SelectedTheme = "Default",
@@ -733,10 +741,19 @@ local NotificationHolder = SetProps(SetChildren(MakeElement("TFrame"), {
 })
 
 function OrionLib:MakeNotification(NotificationConfig)
+
+local Sound = Instance.new("Sound")
+Sound.SoundId = "rbxassetid://127441833735276"
+Sound.Volume = 1
+Sound.Parent = game:GetService("SoundService")
+Sound:Play()
+
+game.Debris:AddItem(Sound, 5)
+
 	spawn(function()
 		NotificationConfig.Name = NotificationConfig.Name or "Notification"
 		NotificationConfig.Content = NotificationConfig.Content or "Test"
-		NotificationConfig.Image = NotificationConfig.Image or "rbxassetid://4384403532"
+		NotificationConfig.Image = NotificationConfig.Image or "rbxassetid://16913919445"
 		NotificationConfig.Time = NotificationConfig.Time or 15
 
 		local NotificationParent = SetProps(MakeElement("TFrame"), {
@@ -1155,13 +1172,6 @@ function OrionLib:MakeWindow(WindowConfig)
 		Active = true -- Bloqueia cliques que passam através do hub
 	}), {
 		MakeElement("Stroke", OrionLib.Themes[OrionLib.SelectedTheme].Stroke, 2.5), -- Borda colorida grossa!
-		--SetProps(MakeElement("Image", "rbxassetid://3523728077"), {
-		--	AnchorPoint = Vector2.new(0.5, 0.5),
-		--	Position = UDim2.new(0.5, 0, 0.5, 0),
-		--	Size = UDim2.new(1, 80, 1, 320),
-		--	ImageColor3 = Color3.fromRGB(33, 33, 33),
-		--	ImageTransparency = 0.7
-		--}),
 		SetChildren(SetProps(MakeElement("TFrame"), {
 			Size = UDim2.new(1, 0, 0, 50),
 			Name = "TopBar"
@@ -1476,6 +1486,8 @@ function OrionLib:MakeWindow(WindowConfig)
 		MainWindow.Visible = false
 		UIHidden = true
 		
+		
+
 		-- FORÇAR DESATIVAÇÃO DO MOUSE UI E MODAL
 		mouselock = false
 		freeMouse.Visible = false
@@ -1596,8 +1608,16 @@ function OrionLib:MakeWindow(WindowConfig)
 	-- Iniciar animação automaticamente
 	startLetterAnimation()
 	
-	AddConnection(MinimizeBtn.MouseButton1Up, function()
-		if Resizing then return end -- Prevenir bug ao minimizar durante resize
+AddConnection(MinimizeBtn.MouseButton1Up, function()
+
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://6698737249"
+	sound.Volume = 1
+	sound.Parent = game:GetService("SoundService")
+	sound:Play()
+	game.Debris:AddItem(sound,3)
+
+	if Resizing then return end
 		
 		if Minimized then
 			-- RESTORE - Animação suave SEM GLITCHES
