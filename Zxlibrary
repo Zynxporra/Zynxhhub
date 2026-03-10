@@ -3779,11 +3779,14 @@ end
 --  CONFIGURAÇÕES AUTOMÁTICAS - Sempre adiciona um tab de Config
 -- ═══════════════════════════════════════════════════════════════
 
+-- Variável global para armazenar a tecla atual
+getgenv().OrionKey = "M" -- Tecla padrão M
+
 -- Função para criar o tab de configurações automaticamente
 local function CreateConfigTab(WindowInstance, TabsFunction)
     -- Criar o tab de Configurações (sempre como último tab)
     local ConfigTab = TabsFunction:MakeTab({
-        Name = "⚙️ Configurações",
+        Name = "Configurações",
         Icon = "rbxassetid://7072720870" -- Ícone de engrenagem
     })
     
@@ -3800,7 +3803,6 @@ local function CreateConfigTab(WindowInstance, TabsFunction)
         Save = true,
         Callback = function(value)
             OrionLib:UpdateTheme({Main = value})
-            -- Atualizar também a cor do Stroke se necessário
             SaveCfg(game.GameId)
         end
     })
@@ -3878,7 +3880,6 @@ local function CreateConfigTab(WindowInstance, TabsFunction)
     -- Botão para tema Roxo Original
     PresetsSection:AddButton({
         Name = "Tema Roxo Original",
-        Icon = "rbxassetid://3944703587",
         Callback = function()
             OrionLib:UpdateTheme({
                 Main = Color3.fromRGB(40, 5, 5),
@@ -3897,18 +3898,17 @@ local function CreateConfigTab(WindowInstance, TabsFunction)
         end
     })
     
-    -- Botão para tema Vermelho (como o da imagem)
+    -- Botão para tema Vermelho
     PresetsSection:AddButton({
         Name = "Tema Vermelho",
-        Icon = "rbxassetid://3944703587",
         Callback = function()
             OrionLib:UpdateTheme({
-                Main = Color3.fromRGB(40, 5, 5),      -- Vermelho escuro
-                Second = Color3.fromRGB(65, 10, 10),  -- Vermelho médio
-                Stroke = Color3.fromRGB(200, 30, 30), -- Vermelho claro
-                Text = Color3.fromRGB(255, 255, 255), -- Branco
-                TextDark = Color3.fromRGB(220, 220, 220), -- Cinza claro
-                Divider = Color3.fromRGB(100, 15, 15) -- Vermelho médio-escuro
+                Main = Color3.fromRGB(40, 5, 5),
+                Second = Color3.fromRGB(65, 10, 10),
+                Stroke = Color3.fromRGB(200, 30, 30),
+                Text = Color3.fromRGB(255, 255, 255),
+                TextDark = Color3.fromRGB(220, 220, 220),
+                Divider = Color3.fromRGB(100, 15, 15)
             })
             SaveCfg(game.GameId)
             OrionLib:MakeNotification({
@@ -3922,7 +3922,6 @@ local function CreateConfigTab(WindowInstance, TabsFunction)
     -- Botão para tema Azul
     PresetsSection:AddButton({
         Name = "Tema Azul",
-        Icon = "rbxassetid://3944703587",
         Callback = function()
             OrionLib:UpdateTheme({
                 Main = Color3.fromRGB(5, 5, 40),
@@ -3944,7 +3943,6 @@ local function CreateConfigTab(WindowInstance, TabsFunction)
     -- Botão para tema Verde
     PresetsSection:AddButton({
         Name = "Tema Verde",
-        Icon = "rbxassetid://3944703587",
         Callback = function()
             OrionLib:UpdateTheme({
                 Main = Color3.fromRGB(5, 40, 5),
@@ -3966,7 +3964,6 @@ local function CreateConfigTab(WindowInstance, TabsFunction)
     -- Botão Resetar para cores padrão
     PresetsSection:AddButton({
         Name = "↺ Resetar Cores",
-        Icon = "rbxassetid://3944703587",
         Callback = function()
             OrionLib:UpdateTheme({
                 Main = Color3.fromRGB(40, 5, 5),
@@ -4002,6 +3999,34 @@ local function CreateConfigTab(WindowInstance, TabsFunction)
         end
     })
     
+    -- ⚠️ NOVO: Bind para mudar a tecla de abrir o Orion
+    InterfaceSection:AddBind({
+        Name = "Tecla para Abrir",
+        Default = Enum.KeyCode.M, -- M é a tecla padrão
+        Flag = "Config_OpenKey",
+        Save = true,
+        Hold = false,
+        Callback = function()
+            -- Não faz nada no clique normal, só quando solta
+        end
+    })
+    
+    -- Label para mostrar a tecla atual
+    local KeyLabel = InterfaceSection:AddLabel("Tecla atual: M")
+    
+    -- Atualizar quando o bind mudar
+    task.spawn(function()
+        while wait(0.5) do
+            if OrionLib.Flags["Config_OpenKey"] then
+                local currentKey = OrionLib.Flags["Config_OpenKey"].Value
+                if currentKey and currentKey ~= "" then
+                    getgenv().OrionKey = currentKey
+                    KeyLabel:Set("Tecla atual: " .. tostring(currentKey))
+                end
+            end
+        end
+    end)
+    
     -- Label informativa
     InterfaceSection:AddLabel("As configurações são salvas automaticamente na pasta 'workspace'")
     
@@ -4011,6 +4036,13 @@ end
 -- Modificar a função MakeWindow para incluir o tab de configurações
 local OriginalMakeWindow = OrionLib.MakeWindow
 OrionLib.MakeWindow = function(WindowConfig)
+    -- Salvar a tecla configurada (se houver)
+    if getgenv().OrionKey then
+        WindowConfig.KeyToOpenWindow = getgenv().OrionKey
+    else
+        WindowConfig.KeyToOpenWindow = "M" -- Tecla padrão
+    end
+    
     -- Chamar a função original para criar a janela
     local TabsFunction = OriginalMakeWindow(WindowConfig)
     
@@ -4021,4 +4053,22 @@ OrionLib.MakeWindow = function(WindowConfig)
     return TabsFunction
 end
 
+-- ⚠️ NOVO: Sistema para atualizar a tecla em tempo real
+task.spawn(function()
+    while wait(1) do
+        if OrionLib.Flags and OrionLib.Flags["Config_OpenKey"] then
+            local newKey = OrionLib.Flags["Config_OpenKey"].Value
+            if newKey and newKey ~= "" and newKey ~= getgenv().OrionKey then
+                getgenv().OrionKey = newKey
+                -- Atualizar todas as janelas existentes (se necessário)
+                for _, v in pairs(Orion:GetDescendants()) do
+                    if v:IsA("ScreenGui") and v.Name == "OrionBliz" then
+                        -- Encontrar e atualizar a tecla de abertura
+                        -- (Isso é gerenciado automaticamente pelo InputBegan)
+                    end
+                end
+            end
+        end
+    end
+end)
 return OrionLib
