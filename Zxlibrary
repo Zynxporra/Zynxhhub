@@ -1857,7 +1857,7 @@ function NL:MakeWindow(wCfg)
 	-- ABA DE CONFIGURAÇÕES EMBUTIDA
 	-- ══════════════════════════════════════════════════════════
 	local function BuildSettingsTab()
-		local ST=TabFn:MakeTab({Name="⚙ Settings",Icon=""})
+		local ST=TabFn:MakeTab({Name="Settings",Icon=""})
 
 		-- APARÊNCIA
 		local App=ST:AddSection({Name="APARÊNCIA"})
@@ -1925,11 +1925,11 @@ function NL:MakeWindow(wCfg)
 
 		-- CONFIG
 		local Cfg=ST:AddSection({Name="CONFIGURAÇÃO"})
-		Cfg:AddButton({Name="💾 Salvar Config",Callback=function()
+		Cfg:AddButton({Name="Salvar Config",Callback=function()
 			sDb=0; SaveCfg(wCfg.ConfigName)
 			NL:Notify({Title="Config Salva",Message=NL.SaveFolder.."/"..wCfg.ConfigName..".json",Duration=4})
 		end})
-		Cfg:AddButton({Name="↺ Resetar Tema",Callback=function()
+		Cfg:AddButton({Name="Resetar Tema",Callback=function()
 			for k,v in pairs(DefaultTheme) do NL.Theme[k]=v end
 			ApplyTheme()
 			NL:Notify({Title="Tema Resetado",Message="Tema padrão restaurado.",Duration=3})
