@@ -1845,7 +1845,333 @@ function NL:MakeWindow(wCfg)
 					return {Rebuild=RebuildList}
 				end
 
-				return E
+			-- ══════════════════════════════════════════════════════
+			-- IMAGE DROPDOWN — dropdown com preview de imagem
+			-- Cada opção mostra uma miniatura ao lado do texto.
+			-- Uso: E:AddImageDropdown({
+			--   Name="Skin", Options={
+			--     {Label="Padrão", Image="rbxassetid://0"},
+			--     {Label="Fogo",   Image="rbxassetid://123"},
+			--   }, Default="Padrão", Callback=function(v) end
+			-- })
+			-- ══════════════════════════════════════════════════════
+			function E:AddImageDropdown(dCfg)
+				dCfg=dCfg or {}; dCfg.Name=dCfg.Name or "Dropdown"
+				dCfg.Options=dCfg.Options or {}  -- {Label=str, Image=str}
+				dCfg.Default=dCfg.Default or (dCfg.Options[1] and dCfg.Options[1].Label or "...")
+				dCfg.Callback=dCfg.Callback or function()end
+				dCfg.Flag=dCfg.Flag or nil; dCfg.Save=dCfg.Save or false
+				local T=NL.Theme
+				local ITEM_H=46  -- altura de cada item com imagem
+				local MaxH=4     -- máximo de itens visíveis sem scroll
+				local DD={Value=dCfg.Default,Options=dCfg.Options,Buttons={},Toggled=false,Type="Dropdown",Save=dCfg.Save}
+
+				-- Encontrar imagem do valor atual
+				local function GetImage(label)
+					for _,o in ipairs(DD.Options) do if o.Label==label then return o.Image or "" end end
+					return ""
+				end
+
+				local outer=New("Frame",{Parent=par,Size=UDim2.new(1,0,0,44),BackgroundColor3=T.BgCard,
+					BorderSizePixel=0,ClipsDescendants=true},{
+					New("UICorner",{CornerRadius=UDim.new(0,8)}),
+					New("UIStroke",{Color=T.Border,Thickness=1}),
+				})
+				Bind(outer,"BackgroundColor3","BgCard"); Bind(outer:FindFirstChildOfClass("UIStroke"),"Color","Border")
+
+				-- Header com preview da seleção atual
+				local hdr=New("Frame",{Parent=outer,Size=UDim2.new(1,0,0,44),BackgroundTransparency=1})
+
+				-- Preview da imagem selecionada (canto esquerdo)
+				local selPrev=New("ImageLabel",{Parent=hdr,Position=UDim2.new(0,6,0.5,-16),
+					Size=UDim2.new(0,32,0,32),BackgroundColor3=T.BgDeep,BorderSizePixel=0,
+					Image=GetImage(DD.Value),ScaleType=Enum.ScaleType.Crop},{
+					New("UICorner",{CornerRadius=UDim.new(0,6)}),
+					New("UIStroke",{Color=T.Border,Thickness=1}),
+				})
+
+				New("TextLabel",{Parent=hdr,Position=UDim2.new(0,46,0,0),Size=UDim2.new(1,-120,1,0),
+					BackgroundTransparency=1,Text=dCfg.Name,Font=Enum.Font.GothamBold,TextSize=14,
+					TextColor3=T.TxtPri,TextXAlignment=Enum.TextXAlignment.Left})
+				Bind(hdr:FindFirstChildOfClass("TextLabel"),"TextColor3","TxtPri")
+
+				local selL=New("TextLabel",{Parent=hdr,Position=UDim2.new(1,-110,0,0),Size=UDim2.new(0,80,1,0),
+					BackgroundTransparency=1,Text=tostring(DD.Value),Font=Enum.Font.GothamMedium,TextSize=12,
+					TextColor3=T.Accent,TextXAlignment=Enum.TextXAlignment.Right,TextTruncate=Enum.TextTruncate.AtEnd})
+				Bind(selL,"TextColor3","Accent")
+
+				local arr=New("ImageLabel",{Parent=hdr,Position=UDim2.new(1,-22,0.5,-8),Size=UDim2.new(0,16,0,16),
+					BackgroundTransparency=1,Image="rbxassetid://7072706796",ImageColor3=T.TxtMut})
+
+				local sep=New("Frame",{Parent=outer,Position=UDim2.new(0,0,0,44),Size=UDim2.new(1,0,0,1),
+					BackgroundColor3=T.Border,BorderSizePixel=0,Visible=false})
+				Bind(sep,"BackgroundColor3","Border")
+
+				local os2=MakeScroll(outer)
+				os2.Position=UDim2.new(0,0,0,45); os2.Size=UDim2.new(1,0,1,-45)
+				New("UIListLayout",{Parent=os2,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,3)})
+				New("UIPadding",{Parent=os2,PaddingLeft=UDim.new(0,6),PaddingRight=UDim.new(0,6),PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,4)})
+				Conn(os2.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"),function()
+					os2.CanvasSize=UDim2.new(0,0,0,os2.UIListLayout.AbsoluteContentSize.Y+8) end)
+
+				local function Refresh()
+					for _,b in pairs(DD.Buttons) do b:Destroy() end; DD.Buttons={}
+					for _,opt in ipairs(DD.Options) do
+						local label=opt.Label or tostring(opt)
+						local img=opt.Image or ""
+						local isSel=(label==DD.Value)
+						local ob=New("TextButton",{Parent=os2,Size=UDim2.new(1,0,0,ITEM_H),
+							BackgroundColor3=isSel and NL.Theme.BgHover or NL.Theme.BgCardAlt,
+							BorderSizePixel=0,Text="",AutoButtonColor=false},{
+							New("UICorner",{CornerRadius=UDim.new(0,7)}),
+							New("UIStroke",{Color=NL.Theme.Border,Thickness=1}),
+						})
+						Bind(ob:FindFirstChildOfClass("UIStroke"),"Color","Border")
+
+						-- Barra indicadora esquerda
+						local selBar=New("Frame",{Parent=ob,Position=UDim2.new(0,0,0.1,0),
+							Size=UDim2.new(0,3,0.8,0),BackgroundColor3=NL.Theme.Accent,
+							BackgroundTransparency=isSel and 0 or 1,BorderSizePixel=0},{
+							New("UICorner",{CornerRadius=UDim.new(1,0)})})
+						Bind(selBar,"BackgroundColor3","Accent")
+
+						-- Preview da imagem do item
+						New("ImageLabel",{Parent=ob,Position=UDim2.new(0,6,0.5,-17),Size=UDim2.new(0,34,0,34),
+							BackgroundColor3=NL.Theme.BgDeep,BorderSizePixel=0,
+							Image=img,ScaleType=Enum.ScaleType.Crop},{
+							New("UICorner",{CornerRadius=UDim.new(0,6)}),
+							New("UIStroke",{Color=NL.Theme.Border,Thickness=1}),
+						})
+
+						-- Label do item
+						local lbl=New("TextLabel",{Parent=ob,Position=UDim2.new(0,48,0.5,-9),
+							Size=UDim2.new(1,-58,0,18),BackgroundTransparency=1,Text=label,
+							Font=Enum.Font.GothamBold,TextSize=13,
+							TextColor3=isSel and NL.Theme.Accent or NL.Theme.TxtPri,
+							TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd})
+
+						Conn(ob.MouseButton1Up,function() DD:Set(label); SaveCfg(wCfg.ConfigName) end)
+						Conn(ob.MouseEnter,function()
+							if label~=DD.Value then Tween(ob,TW.Fast,{BackgroundColor3=NL.Theme.BgHover}) end
+						end)
+						Conn(ob.MouseLeave,function()
+							Tween(ob,TW.Fast,{BackgroundColor3=label==DD.Value and NL.Theme.BgHover or NL.Theme.BgCardAlt})
+						end)
+						DD.Buttons[label]=ob
+					end
+				end
+
+				function DD:Set(v)
+					local found=false
+					for _,o in ipairs(DD.Options) do if o.Label==v then found=true break end end
+					DD.Value=found and v or (DD.Options[1] and DD.Options[1].Label or "...")
+					selL.Text=tostring(DD.Value)
+					selPrev.Image=GetImage(DD.Value)
+					for lbl,ob in pairs(DD.Buttons) do
+						local isSel=(lbl==DD.Value)
+						local bar=ob:FindFirstChildOfClass("Frame")
+						local txt=ob:FindFirstChildOfClass("TextLabel")
+						if bar then Tween(bar,TW.Fast,{BackgroundTransparency=isSel and 0 or 1}) end
+						if txt then Tween(txt,TW.Fast,{TextColor3=isSel and NL.Theme.Accent or NL.Theme.TxtPri}) end
+						Tween(ob,TW.Fast,{BackgroundColor3=isSel and NL.Theme.BgHover or NL.Theme.BgCardAlt})
+					end
+					dCfg.Callback(DD.Value)
+				end
+
+				function DD:Refresh(opts,clear)
+					if clear then DD.Options={} end
+					for _,o in ipairs(opts) do table.insert(DD.Options,o) end; Refresh()
+				end
+
+				local hb=New("TextButton",{Parent=hdr,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",AutoButtonColor=false})
+				Conn(hb.MouseButton1Up,function()
+					DD.Toggled=not DD.Toggled; sep.Visible=DD.Toggled
+					Tween(arr,TW.Fast,{Rotation=DD.Toggled and 180 or 0})
+					local visH=math.min(#DD.Options,MaxH)*ITEM_H+8+8  -- 8 pad top+bot
+					Tween(outer,TW.Mid,{Size=DD.Toggled and UDim2.new(1,0,0,44+visH) or UDim2.new(1,0,0,44)})
+				end)
+
+				Refresh(); DD:Set(DD.Value)
+				if dCfg.Flag then NL.Flags[dCfg.Flag]=DD end
+				return DD
+			end
+
+			-- ══════════════════════════════════════════════════════
+			-- TOGGLE SLIDER — toggle que ao ativar revela um slider
+			-- com animação suave de aparecer de baixo do toggle.
+			-- Uso: E:AddToggleSlider({
+			--   Name="Velocidade",
+			--   Default=false,          -- toggle começa desativado
+			--   SliderMin=0, SliderMax=100, SliderDefault=50,
+			--   SliderIncrement=1, SliderSuffix="",
+			--   ToggleCallback=function(v) end,  -- quando toggle muda
+			--   SliderCallback=function(v) end,  -- quando slider move
+			--   Flag="myFlag", Save=false,
+			-- })
+			-- ══════════════════════════════════════════════════════
+			function E:AddToggleSlider(tsCfg)
+				tsCfg=tsCfg or {}
+				tsCfg.Name            = tsCfg.Name            or "Toggle Slider"
+				tsCfg.Default         = tsCfg.Default         or false
+				tsCfg.SliderMin       = tsCfg.SliderMin       or 0
+				tsCfg.SliderMax       = tsCfg.SliderMax       or 100
+				tsCfg.SliderDefault   = math.clamp(tsCfg.SliderDefault or tsCfg.SliderMin, tsCfg.SliderMin, tsCfg.SliderMax)
+				tsCfg.SliderIncrement = tsCfg.SliderIncrement or 1
+				tsCfg.SliderSuffix    = tsCfg.SliderSuffix    or ""
+				tsCfg.ToggleCallback  = tsCfg.ToggleCallback  or function()end
+				tsCfg.SliderCallback  = tsCfg.SliderCallback  or function()end
+				tsCfg.Flag            = tsCfg.Flag            or nil
+				tsCfg.Save            = tsCfg.Save            or false
+
+				local T=NL.Theme
+				local TOGGLE_H = 40   -- altura do toggle
+				local SLIDER_H = 48   -- altura do slider quando expandido
+				local TOTAL_H  = TOGGLE_H + SLIDER_H
+
+				-- Objeto público com estado dos dois
+				local TS={
+					Value   = tsCfg.Default,         -- estado do toggle
+					Slider  = tsCfg.SliderDefault,    -- valor do slider
+					Type    = "ToggleSlider",
+					Save    = tsCfg.Save,
+				}
+				local dragging=false
+
+				-- Card externo — começa com altura do toggle apenas
+				local c=New("Frame",{Parent=par,BackgroundColor3=T.BgCard,BorderSizePixel=0,
+					Size=UDim2.new(1,0,0,TOGGLE_H),ClipsDescendants=true},{
+					New("UICorner",{CornerRadius=UDim.new(0,7)}),
+					New("UIStroke",{Color=T.Border,Thickness=1}),
+				})
+				Bind(c,"BackgroundColor3","BgCard"); Bind(c:FindFirstChildOfClass("UIStroke"),"Color","Border")
+
+				-- ── TOGGLE ROW ──────────────────────────────────
+				local togRow=New("Frame",{Parent=c,Size=UDim2.new(1,0,0,TOGGLE_H),BackgroundTransparency=1})
+				New("TextLabel",{Parent=togRow,Position=UDim2.new(0,14,0,0),Size=UDim2.new(1,-62,1,0),
+					BackgroundTransparency=1,Text=tsCfg.Name,Font=Enum.Font.GothamBold,TextSize=14,
+					TextColor3=T.TxtPri,TextXAlignment=Enum.TextXAlignment.Left})
+				Bind(togRow:FindFirstChildOfClass("TextLabel"),"TextColor3","TxtPri")
+
+				local Trk=New("Frame",{Parent=togRow,Position=UDim2.new(1,-54,0.5,-11),
+					Size=UDim2.new(0,42,0,22),BackgroundColor3=T.Border,BorderSizePixel=0},{
+					New("UICorner",{CornerRadius=UDim.new(1,0)})})
+				local Thm=New("Frame",{Parent=Trk,Position=UDim2.new(0,2,0.5,-9),
+					Size=UDim2.new(0,18,0,18),BackgroundColor3=T.TxtMut,BorderSizePixel=0},{
+					New("UICorner",{CornerRadius=UDim.new(1,0)})})
+
+				-- ── SLIDER ROW (começa fora da view — abaixo) ───
+				local slRow=New("Frame",{Parent=c,Position=UDim2.new(0,0,0,TOGGLE_H),
+					Size=UDim2.new(1,0,0,SLIDER_H),BackgroundTransparency=1,ClipsDescendants=false})
+				New("UIPadding",{Parent=slRow,PaddingLeft=UDim.new(0,14),PaddingRight=UDim.new(0,14),
+					PaddingTop=UDim.new(0,6),PaddingBottom=UDim.new(0,6)})
+
+				local nameRow=New("Frame",{Parent=slRow,Size=UDim2.new(1,0,0,20),BackgroundTransparency=1})
+				local slNameL=New("TextLabel",{Parent=nameRow,Size=UDim2.new(0.65,0,1,0),
+					BackgroundTransparency=1,Text=tsCfg.Name,Font=Enum.Font.GothamBold,TextSize=13,
+					TextColor3=T.TxtSec,TextXAlignment=Enum.TextXAlignment.Left})
+				Bind(slNameL,"TextColor3","TxtSec")
+				local valL=New("TextLabel",{Parent=nameRow,Position=UDim2.new(0.65,0,0,0),
+					Size=UDim2.new(0.35,0,1,0),BackgroundTransparency=1,
+					Text=tostring(tsCfg.SliderDefault).." "..tsCfg.SliderSuffix,
+					Font=Enum.Font.GothamBold,TextSize=13,TextColor3=T.Accent,
+					TextXAlignment=Enum.TextXAlignment.Right})
+				Bind(valL,"TextColor3","Accent")
+
+				local trkBg=New("Frame",{Parent=slRow,Position=UDim2.new(0,0,0,24),
+					Size=UDim2.new(1,0,0,10),BackgroundColor3=T.BgDeep,BorderSizePixel=0,ZIndex=10},{
+					New("UICorner",{CornerRadius=UDim.new(1,0)}),
+					New("UIStroke",{Color=T.Border,Thickness=1}),
+				})
+				local trkFill=New("Frame",{Parent=trkBg,Size=UDim2.new(0,0,1,0),
+					BackgroundColor3=T.Accent,BorderSizePixel=0,ZIndex=11},{
+					New("UICorner",{CornerRadius=UDim.new(1,0)}),
+					New("UIGradient",{Color=ColorSequence.new{
+						ColorSequenceKeypoint.new(0,Color3.fromRGB(200,255,255)),
+						ColorSequenceKeypoint.new(0.4,T.Accent),
+						ColorSequenceKeypoint.new(1,T.AccentDim),
+					}}),
+				})
+				Bind(trkFill,"BackgroundColor3","Accent")
+
+				local thumb=New("Frame",{Parent=trkBg,Position=UDim2.new(0,-8,0.5,-8),
+					Size=UDim2.new(0,16,0,16),BackgroundColor3=Color3.fromRGB(255,255,255),BorderSizePixel=0,ZIndex=12},{
+					New("UICorner",{CornerRadius=UDim.new(1,0)}),
+					New("UIStroke",{Color=T.Accent,Thickness=2}),
+				})
+
+				-- Linha divisória entre toggle e slider
+				New("Frame",{Parent=c,Position=UDim2.new(0,14,0,TOGGLE_H-1),
+					Size=UDim2.new(1,-28,0,1),BackgroundColor3=T.Border,BorderSizePixel=0})
+
+				-- ── FUNÇÕES DE ESTADO ───────────────────────────
+				local function SetSliderValue(v)
+					TS.Slider=math.clamp(Round(v,tsCfg.SliderIncrement),tsCfg.SliderMin,tsCfg.SliderMax)
+					local pct=(TS.Slider-tsCfg.SliderMin)/math.max(tsCfg.SliderMax-tsCfg.SliderMin,0.001)
+					trkFill.Size=UDim2.new(pct,0,1,0)
+					thumb.Position=UDim2.new(pct,-8,0.5,-8)
+					valL.Text=tostring(TS.Slider).." "..tsCfg.SliderSuffix
+					tsCfg.SliderCallback(TS.Slider)
+				end
+
+				function TS:Set(togVal, slVal)
+					TS.Value = togVal
+					-- Animar toggle
+					if togVal then
+						Tween(Trk,TW.Mid,{BackgroundColor3=NL.Theme.Accent})
+						Tween(Thm,TW.Mid,{BackgroundColor3=Color3.fromRGB(255,255,255),Position=UDim2.new(1,-20,0.5,-9)})
+						-- Expandir card com animação — slider aparece de baixo
+						Tween(c,TweenInfo.new(0.32,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),
+							{Size=UDim2.new(1,0,0,TOTAL_H)})
+					else
+						Tween(Trk,TW.Mid,{BackgroundColor3=NL.Theme.Border})
+						Tween(Thm,TW.Mid,{BackgroundColor3=NL.Theme.TxtMut,Position=UDim2.new(0,2,0.5,-9)})
+						-- Recolher card
+						Tween(c,TweenInfo.new(0.28,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),
+							{Size=UDim2.new(1,0,0,TOGGLE_H)})
+					end
+					tsCfg.ToggleCallback(togVal)
+					if slVal ~= nil then SetSliderValue(slVal) end
+				end
+
+				-- Botão do toggle (só a row do toggle)
+				local togBtn=New("TextButton",{Parent=togRow,Size=UDim2.new(1,0,1,0),
+					BackgroundTransparency=1,Text="",AutoButtonColor=false})
+				Conn(togBtn.MouseButton1Up,function()
+					TS:Set(not TS.Value)
+					SaveCfg(wCfg.ConfigName)
+				end)
+				Conn(togBtn.MouseEnter,function() Tween(c,TW.Fast,{BackgroundColor3=NL.Theme.BgHover}) end)
+				Conn(togBtn.MouseLeave,function() Tween(c,TW.Fast,{BackgroundColor3=NL.Theme.BgCard}) end)
+
+				-- Drag do slider
+				Conn(trkBg.InputBegan,function(inp)
+					if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
+						if not TS.Value then return end  -- slider desabilitado quando toggle off
+						dragging=true
+						local px=math.clamp((inp.Position.X-trkBg.AbsolutePosition.X)/math.max(trkBg.AbsoluteSize.X,1),0,1)
+						SetSliderValue(tsCfg.SliderMin+(tsCfg.SliderMax-tsCfg.SliderMin)*px)
+					end
+				end)
+				Conn(UIS.InputChanged,function(inp)
+					if dragging and (inp.UserInputType==Enum.UserInputType.MouseMovement or inp.UserInputType==Enum.UserInputType.Touch) then
+						local px=math.clamp((inp.Position.X-trkBg.AbsolutePosition.X)/math.max(trkBg.AbsoluteSize.X,1),0,1)
+						SetSliderValue(tsCfg.SliderMin+(tsCfg.SliderMax-tsCfg.SliderMin)*px)
+					end
+				end)
+				Conn(UIS.InputEnded,function(inp)
+					if dragging and (inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch) then
+						dragging=false; SaveCfg(wCfg.ConfigName)
+					end
+				end)
+
+				-- Inicializar
+				task.spawn(function() TS:Set(tsCfg.Default) end)
+				SetSliderValue(tsCfg.SliderDefault)
+				if tsCfg.Flag then NL.Flags[tsCfg.Flag]=TS end
+				return TS
+			end
+
+							return E
 			end -- BuildElements
 
 		local EF={}
