@@ -129,9 +129,9 @@ local DefaultTheme = {
 	BorderLit = Color3.fromRGB(0, 180, 220),
 
 	-- Texto
-	TxtPri = Color3.fromRGB(225, 228, 242),
-	TxtSec = Color3.fromRGB(110, 118, 150),
-	TxtMut = Color3.fromRGB(55,  60,  88),
+	TxtPri = Color3.fromRGB(238, 240, 250),  -- branco quente, máxima legibilidade
+	TxtSec = Color3.fromRGB(160, 166, 195),  -- cinza azulado mais claro
+	TxtMut = Color3.fromRGB(100, 106, 135),  -- muted mais visível
 
 	-- Misc
 	ScrollBar   = Color3.fromRGB(0, 180, 220),
@@ -1280,18 +1280,55 @@ function NL:MakeWindow(wCfg)
 				New("UIListLayout",{Parent=os2,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,2)})
 				New("UIPadding",{Parent=os2,PaddingLeft=UDim.new(0,7),PaddingRight=UDim.new(0,7),PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,4)})
 				Conn(os2.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"),function() os2.CanvasSize=UDim2.new(0,0,0,os2.UIListLayout.AbsoluteContentSize.Y+8) end)
-				local function ApplySel(b,s) local sb=b:FindFirstChild("SB"); local Tx=NL.Theme
-					if s then Tween(b,TW.Mid,{BackgroundColor3=SelBg()}); if sb then Tween(sb,TW.Fast,{BackgroundTransparency=0}) end
-						for _,l in ipairs(b:GetChildren()) do if l:IsA("TextLabel") and l.Font==Enum.Font.GothamBold then Tween(l,TW.Fast,{TextColor3=Tx.Accent}) end end
-					else Tween(b,TW.Mid,{BackgroundColor3=Tx.BgCard}); if sb then Tween(sb,TW.Fast,{BackgroundTransparency=1}) end
-						for _,l in ipairs(b:GetChildren()) do if l:IsA("TextLabel") and l.Font==Enum.Font.GothamBold then Tween(l,TW.Fast,{TextColor3=Tx.TxtPri}) end end
+				local TxtNormalPD = Color3.fromRGB(230,232,242)  -- branco levemente azulado para boa leitura
+				local function ApplySel(b,s)
+					local sb=b:FindFirstChild("SB"); local Tx=NL.Theme
+					if s then
+						Tween(b,TW.Mid,{BackgroundColor3=SelBg()})
+						if sb then Tween(sb,TW.Fast,{BackgroundTransparency=0}) end
+						for _,l in ipairs(b:GetChildren()) do
+							if l:IsA("TextLabel") and l.Font==Enum.Font.GothamBold then
+								Tween(l,TW.Fast,{TextColor3=Tx.Accent})
+							end
+						end
+					else
+						Tween(b,TW.Mid,{BackgroundColor3=Tx.BgCard})
+						if sb then Tween(sb,TW.Fast,{BackgroundTransparency=1}) end
+						for _,l in ipairs(b:GetChildren()) do
+							if l:IsA("TextLabel") and l.Font==Enum.Font.GothamBold then
+								-- Usar branco claro ao desselecionar para boa visibilidade
+								Tween(l,TW.Fast,{TextColor3=TxtNormalPD})
+							end
+						end
 					end
 				end
-				local function RemOpt(name) local b=DD.Buttons[name]; if not b then return end
+				local function RemOpt(name)
+					local b=DD.Buttons[name]; if not b then return end
 					if table.find(SelVals,name) then
-						local si=b:FindFirstChild("DisIco"); Tween(b,TW.Mid,{BackgroundColor3=Color3.fromRGB(55,10,10)})
-						if si then si.Visible=true end; b:SetAttribute("DC",true)
-					else b:Destroy(); DD.Buttons[name]=nil; Opts=Opts-1 end
+						-- Estava selecionado: marcar como DC (vermelho) com opção de desmarcar ao clicar
+						Tween(b,TW.Mid,{BackgroundColor3=Color3.fromRGB(60,10,10)})
+						local si=b:FindFirstChild("DisIco")
+						if si then si.Visible=true end
+						-- Atualizar cores dos textos para visibilidade no fundo vermelho
+						for _,lbl in ipairs(b:GetChildren()) do
+							if lbl:IsA("TextLabel") then
+								Tween(lbl,TW.Fast,{TextColor3=Color3.fromRGB(215,105,105)})
+							end
+						end
+						-- Label "● Kitou" para indicar que pode clicar para desmarcar
+						if not b:FindFirstChild("KitouLbl") then
+							New("TextLabel",{Parent=b,Name="KitouLbl",
+								Position=UDim2.new(1,-76,0.5,-8),Size=UDim2.new(0,54,0,16),
+								BackgroundTransparency=1,Text="✕ Kitou",
+								Font=Enum.Font.GothamBold,TextSize=10,
+								TextColor3=Color3.fromRGB(255,80,80),
+								TextXAlignment=Enum.TextXAlignment.Right})
+						end
+						b:SetAttribute("DC",true)
+					else
+						-- Não estava selecionado: remover imediatamente
+						b:Destroy(); DD.Buttons[name]=nil; Opts=Opts-1
+					end
 				end
 				-- Detectar se o personagem do jogador está dentro de uma Folder no workspace
 				local function IsInFolder(player)
@@ -1326,10 +1363,11 @@ function NL:MakeWindow(wCfg)
 					local di=New("ImageLabel",{Parent=ob,Position=UDim2.new(1,-22,0.5,-11),Size=UDim2.new(0,22,0,22),BackgroundTransparency=1,Image="rbxassetid://7072725342",ImageColor3=Color3.fromRGB(255,80,80),Visible=false,Name="DisIco"})
 					-- Ícone de casinha AZUL — jogador está dentro de uma Folder no workspace
 					local folderIco=New("ImageLabel",{Parent=ob,Position=UDim2.new(1,-46,0.5,-9),Size=UDim2.new(0,18,0,18),BackgroundTransparency=1,Image="rbxassetid://6693712941",ImageColor3=Color3.fromRGB(80,160,255),Visible=inFolder,Name="FolderIco"})
-					-- Nome em azul se estiver em pasta, cor normal caso contrário
-					local nameColor = inFolder and Color3.fromRGB(80,160,255) or (isSel and NL.Theme.Accent or NL.Theme.TxtPri)
-					local nameL=New("TextLabel",{Parent=ob,Position=UDim2.new(0,52,0,7),Size=UDim2.new(1,-76,0,18),BackgroundTransparency=1,Text=pd,Font=Enum.Font.GothamBold,TextSize=14,TextColor3=nameColor,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,Name="NameL"})
-					New("TextLabel",{Parent=ob,Position=UDim2.new(0,52,0,24),Size=UDim2.new(1,-76,0,16),BackgroundTransparency=1,Text="@"..pn,Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=NL.Theme.TxtSec,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd})
+					-- Nome: azul se em pasta, destaque accent se selecionado, branco para máxima legibilidade
+					local TxtNormal = Color3.fromRGB(230,232,242)  -- quase branco para máxima legibilidade
+					local nameColor = inFolder and Color3.fromRGB(80,160,255) or (isSel and NL.Theme.Accent or TxtNormal)
+					local nameL=New("TextLabel",{Parent=ob,Position=UDim2.new(0,52,0,6),Size=UDim2.new(1,-80,0,19),BackgroundTransparency=1,Text=pd,Font=Enum.Font.GothamBold,TextSize=14,TextColor3=nameColor,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,Name="NameL"})
+					New("TextLabel",{Parent=ob,Position=UDim2.new(0,52,0,25),Size=UDim2.new(1,-80,0,15),BackgroundTransparency=1,Text="@"..pn,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Color3.fromRGB(160,165,190),TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd})
 					-- Atualizar ícone de pasta em tempo real (personagem pode mudar de lugar)
 					task.spawn(function()
 						while ob and ob.Parent do
@@ -1339,13 +1377,45 @@ function NL:MakeWindow(wCfg)
 							folderIco.Visible=nowInFolder
 							-- Só mudar cor do nome se não estiver selecionado
 							if not table.find(SelVals,pn) and not ob:GetAttribute("DC") then
-								nameL.TextColor3=nowInFolder and Color3.fromRGB(80,160,255) or NL.Theme.TxtPri
+								nameL.TextColor3=nowInFolder and Color3.fromRGB(80,160,255) or Color3.fromRGB(230,232,242)
 							end
 						end
 					end)
-					Conn(ob.MouseButton1Up,function() if ob:GetAttribute("DC") then return end; DD:Set(pn); SaveCfg(wCfg.ConfigName) end)
-					Conn(ob.MouseEnter,function() if ob:GetAttribute("DC") then return end; if table.find(SelVals,pn) then return end; Tween(ob,TW.Fast,{BackgroundColor3=NL.Theme.BgHover}) end)
-					Conn(ob.MouseLeave,function() if ob:GetAttribute("DC") then return end; Tween(ob,TW.Fast,{BackgroundColor3=table.find(SelVals,pn) and SelBg() or NL.Theme.BgCard}) end)
+					Conn(ob.MouseButton1Up,function()
+						if ob:GetAttribute("DC") then
+							-- Kitou mas estava selecionado: clicar desmarca e remove da lista
+							local idx2=table.find(SelVals,pn)
+							if idx2 then table.remove(SelVals,idx2) end
+							-- Atualizar label selecionado
+							local txt2=""
+							for i,v in pairs(SelVals) do
+								txt2=txt2..(i==#SelVals and v or v..", ")
+							end
+							selL.Text=#SelVals>0 and txt2 or "Selecione"
+							-- Destruir o botão e atualizar Opts
+							ob:Destroy(); DD.Buttons[pn]=nil; Opts=Opts-1
+							-- Chamar callback com lista atualizada
+							dCfg.Callback(SelVals)
+							return
+						end
+						DD:Set(pn); SaveCfg(wCfg.ConfigName)
+					end)
+					Conn(ob.MouseEnter,function()
+						if ob:GetAttribute("DC") then
+							-- Hover no vermelho: mostrar que é clicável para desmarcar
+							Tween(ob,TW.Fast,{BackgroundColor3=Color3.fromRGB(90,15,15)})
+							return
+						end
+						if table.find(SelVals,pn) then return end
+						Tween(ob,TW.Fast,{BackgroundColor3=NL.Theme.BgHover})
+					end)
+					Conn(ob.MouseLeave,function()
+						if ob:GetAttribute("DC") then
+							Tween(ob,TW.Fast,{BackgroundColor3=Color3.fromRGB(60,10,10)})
+							return
+						end
+						Tween(ob,TW.Fast,{BackgroundColor3=table.find(SelVals,pn) and SelBg() or NL.Theme.BgCard})
+					end)
 					DD.Buttons[pn]=ob; Opts=Opts+1
 				end
 				for _,p in pairs(Players:GetPlayers()) do AddOpt(p) end
@@ -1787,7 +1857,7 @@ function NL:MakeWindow(wCfg)
 	-- ABA DE CONFIGURAÇÕES EMBUTIDA
 	-- ══════════════════════════════════════════════════════════
 	local function BuildSettingsTab()
-		local ST=TabFn:MakeTab({Name="⚙",Icon=""})
+		local ST=TabFn:MakeTab({Name="⚙ Settings",Icon=""})
 
 		-- APARÊNCIA
 		local App=ST:AddSection({Name="APARÊNCIA"})
@@ -1855,11 +1925,11 @@ function NL:MakeWindow(wCfg)
 
 		-- CONFIG
 		local Cfg=ST:AddSection({Name="CONFIGURAÇÃO"})
-		Cfg:AddButton({Name="Salvar Config",Callback=function()
+		Cfg:AddButton({Name="💾 Salvar Config",Callback=function()
 			sDb=0; SaveCfg(wCfg.ConfigName)
 			NL:Notify({Title="Config Salva",Message=NL.SaveFolder.."/"..wCfg.ConfigName..".json",Duration=4})
 		end})
-		Cfg:AddButton({Name="Resetar Tema",Callback=function()
+		Cfg:AddButton({Name="↺ Resetar Tema",Callback=function()
 			for k,v in pairs(DefaultTheme) do NL.Theme[k]=v end
 			ApplyTheme()
 			NL:Notify({Title="Tema Resetado",Message="Tema padrão restaurado.",Duration=3})
