@@ -300,16 +300,16 @@ function PacketDetector:compressArgs(args)
 	for _, v in ipairs(args) do
 		local key
 		if typeof(v) == "string" then
-			key = "📝 " .. self:shortenString(v)
+			key = " " .. self:shortenString(v)
 			stringSizes[key] = (stringSizes[key] or 0) + #v
 		elseif typeof(v) == "Instance" then
-			key = "🔧 " .. v.ClassName .. "(" .. v.Name .. ")"
+			key = " " .. v.ClassName .. "(" .. v.Name .. ")"
 		elseif typeof(v) == "table" then
-			key = "📦 " .. self:summarizeTable(v)
+			key = " " .. self:summarizeTable(v)
 		elseif typeof(v) == "number" then
-			key = "🔢 " .. string.format("%.2f", v)
+			key = " " .. string.format("%.2f", v)
 		else
-			key = "📄 " .. typeof(v) .. ":" .. tostring(v):sub(1, 50)
+			key = " " .. typeof(v) .. ":" .. tostring(v):sub(1, 50)
 		end
 		table.insert(summary, key)
 	end
@@ -317,7 +317,7 @@ function PacketDetector:compressArgs(args)
 	-- Adiciona info de tamanho das strings
 	for k, size in pairs(stringSizes) do
 		if size > 500 then
-			table.insert(summary, "⚠️ " .. k .. " (" .. string.format("%.2f", size/1024) .. " KB)")
+			table.insert(summary, "porra " .. k .. " (" .. string.format("%.2f", size/1024) .. " KB)")
 		end
 	end
 	
@@ -327,11 +327,11 @@ end
 function PacketDetector:showNotification(sender, mbSize, args, remoteName)
 	local summarized = self:compressArgs(args)
 	local msgLines = {
-		"👤 " .. sender.DisplayName .. " (@" .. sender.Name .. ")",
-		"📦 " .. string.format("%.3f MB", mbSize),
-		"🎯 " .. remoteName,
+		". " .. sender.DisplayName .. " (@" .. sender.Name .. ")",
+		". " .. string.format("%.3f MB", mbSize),
+		" ." .. remoteName,
 		"",
-		"📋 ARGUMENTOS:",
+		" ARGUMENTOS:",
 	}
 	
 	for i, line in ipairs(summarized) do
@@ -369,13 +369,13 @@ function PacketDetector:start()
 	-- Procura pelo remote específico
 	local grabEvents = game:GetService("ReplicatedStorage"):FindFirstChild("GrabEvents")
 	if not grabEvents then
-		ZNX:Notify({Title="⚠️ Detector", Message="Remote 'GrabEvents' não encontrado", Duration=3, Type="warn"})
+		ZNX:Notify({Title=" Detector", Message="Remote 'GrabEvents' não encontrado", Duration=3, Type="warn"})
 		return
 	end
 	
 	local extendGrabLine = grabEvents:FindFirstChild("ExtendGrabLine")
 	if not extendGrabLine then
-		ZNX:Notify({Title="⚠️ Detector", Message="Remote 'ExtendGrabLine' não encontrado", Duration=3, Type="warn"})
+		ZNX:Notify({Title=" Detector", Message="Remote 'ExtendGrabLine' não encontrado", Duration=3, Type="warn"})
 		return
 	end
 	
@@ -407,7 +407,7 @@ function PacketDetector:start()
 	end)
 	
 	self.Active = true
-	ZNX:Notify({Title="🔍 Packet Detector", Message="Ativo - Monitorando pacotes suspeitos", Duration=3, Type="ok"})
+	ZNX:Notify({Title=" Packet Detector", Message="Ativo - Monitorando pacotes suspeitos", Duration=3, Type="ok"})
 end
 
 function PacketDetector:stop()
@@ -416,7 +416,7 @@ function PacketDetector:stop()
 		self.Connection = nil
 	end
 	self.Active = false
-	ZNX:Notify({Title="🔍 Packet Detector", Message="Desativado", Duration=2, Type="info"})
+	ZNX:Notify({Title=" Packet Detector", Message="Desativado", Duration=2, Type="info"})
 end
 
 -- ═══════════════════════════════════════════════════════════════
@@ -1586,14 +1586,14 @@ function ZNX:MakeWindow(wCfg)
 		
 		-- Descrição do detector
 		Security:AddParagraph("Packet Detector", [[
-🔍 Monitora pacotes suspeitos enviados pelo servidor.
-⚠️ Detecta transferências anormais de dados e possíveis exploits.
-⚡ Aura visual e notificações detalhadas quando algo suspeito é encontrado.
+ Monitora pacotes suspeitos enviados pelo servidor.
+ Detecta transferências anormais de dados e possíveis exploits.
+ Aura visual e notificações detalhadas quando algo suspeito é encontrado.
 		]])
 		
 		-- Toggle principal do detector
 		local packetToggle = Security:AddToggle({
-			Name = "🔍 Detectar Pacotes Suspeitos",
+			Name = " Detectar Pacotes Suspeitos",
 			Default = false,
 			Save = true,
 			Flag = "PacketDetector",
@@ -1646,12 +1646,12 @@ function ZNX:MakeWindow(wCfg)
 		
 		-- Botão para testar o detector
 		AdvSecurity:AddButton({
-			Name = "🧪 Testar Detector",
+			Name = " Testar Detector",
 			Callback = function()
 				-- Simula um pacote de teste
 				local testData = string.rep("A", 10 * 1024) -- 10KB de dados de teste
 				ZNX:Notify({
-					Title = "🔍 Teste do Detector",
+					Title = " Teste do Detector",
 					Message = "Simulando pacote de " .. string.format("%.2f", 10 / 1024) .. " MB\n" ..
 							  "Se o detector estiver ativo, você deve ver um alerta em breve.",
 					Duration = 5,
@@ -1671,7 +1671,7 @@ function ZNX:MakeWindow(wCfg)
 			end
 		})
 
-		local PS = ST:AddSection({Name = "🎨 Presets"})
+		local PS = ST:AddSection({Name = " Presets"})
 		local Presets = {
 			["Obsidian (padrão)"] = {Bg0 = Color3.fromRGB(4, 4, 6), Bg1 = Color3.fromRGB(7, 7, 12), Bg2 = Color3.fromRGB(10, 10, 17), A = Color3.fromRGB(0, 210, 255), A2 = Color3.fromRGB(255, 50, 180), Line = Color3.fromRGB(24, 24, 40)},
 			["Crimson Night"] = {Bg0 = Color3.fromRGB(5, 2, 2), Bg1 = Color3.fromRGB(9, 4, 4), Bg2 = Color3.fromRGB(15, 7, 7), A = Color3.fromRGB(230, 45, 60), A2 = Color3.fromRGB(255, 100, 40), Line = Color3.fromRGB(44, 14, 14)},
@@ -1698,7 +1698,7 @@ function ZNX:MakeWindow(wCfg)
 			end})
 		end
 
-		local Cfg = ST:AddSection({Name = "💾 Configuração"})
+		local Cfg = ST:AddSection({Name = " Configuração"})
 		Cfg:AddButton({Name = "Salvar configuração", Callback = function()
 			sDb = 0
 			SaveCfg(wCfg.ConfigName)
@@ -1721,7 +1721,7 @@ function ZNX:MakeWindow(wCfg)
 		end})
 		Cfg:AddBind({Name = "Tecla toggle", Default = Enum.KeyCode[wCfg.ToggleKey] or Enum.KeyCode.M, Callback = function() end})
 
-		local ImgS = ST:AddSection({Name = "🖼️ Imagens salvas"})
+		local ImgS = ST:AddSection({Name = " Imagens salvas"})
 		ImgS:AddImageDropdown({Name = "Gerenciar imagens", SaveKey = "__ZNX5Bg", OnApply = function(id)
 			wCfg.BgImage = id
 			BgImg.Image = "rbxassetid://" .. id
@@ -1729,11 +1729,11 @@ function ZNX:MakeWindow(wCfg)
 			ZNX:Notify({Title = "Imagem aplicada", Duration = 3, Type = "ok"})
 		end})
 
-		local Info = ST:AddSection({Name = "ℹ️ Sessão"})
-		Info:AddLabel("👤 Jogador: " .. LP.DisplayName .. " (@" .. LP.Name .. ")")
-		Info:AddLabel("🆔 UID: " .. LP.UserId)
-		Info:AddLabel("🔧 ZNXHUB v5.1 · Obsidian + Packet Shield")
-		Info:AddLabel("🛡️ Packet Detector: " .. (PacketDetector.Active and "✅ Ativo" or "❌ Inativo"))
+		local Info = ST:AddSection({Name = " Sessão"})
+		Info:AddLabel(" Jogador: " .. LP.DisplayName .. " (@" .. LP.Name .. ")")
+		Info:AddLabel(" UID: " .. LP.UserId)
+		Info:AddLabel(" ZNXHUB v5.1 · Obsidian + Packet Shield")
+		Info:AddLabel(" Packet Detector: " .. (PacketDetector.Active and " Ativo" or " Inativo"))
 		
 		-- Atualiza status do detector na interface
 		task.spawn(function()
@@ -1741,7 +1741,7 @@ function ZNX:MakeWindow(wCfg)
 				task.wait(2)
 				for _, lbl in ipairs(Info:GetChildren()) do
 					if lbl:IsA("TextLabel") and lbl.Text:find("Packet Detector") then
-						lbl.Text = "🛡️ Packet Detector: " .. (PacketDetector.Active and "✅ Ativo" or "❌ Inativo")
+						lbl.Text = " Packet Detector: " .. (PacketDetector.Active and " Ativo" or " Inativo")
 					end
 				end
 			end
