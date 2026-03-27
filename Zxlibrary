@@ -171,7 +171,7 @@ function ZNX:Notify(cfg)
 	cfg.Message  = cfg.Message  or ""
 	cfg.Duration = cfg.Duration or 5
 	cfg.Type     = cfg.Type     or "info"
-	cfg.Aura     = cfg.Aura     or false  -- Efeito de aura para detecções
+	cfg.Aura     = cfg.Aura     or false
 
 	local accent
 	if     cfg.Type=="ok"   or cfg.Type=="success" then accent=Color3.fromRGB(40,210,90)
@@ -192,7 +192,6 @@ function ZNX:Notify(cfg)
 			N("UIStroke",{Color=accent,Thickness=2,Transparency=0.2}),
 		})
 
-		-- Efeito de aura (glow) para detecções críticas
 		if cfg.Aura then
 			local glow=N("Frame",{Parent=card,Size=UDim2.new(1,4,1,4),Position=UDim2.new(-2,-2,0,0),BackgroundColor3=accent,BackgroundTransparency=0.8,BorderSizePixel=0,ZIndex=0},{
 				N("UICorner",{CornerRadius=UDim.new(0,14)}),
@@ -216,7 +215,7 @@ function ZNX:Notify(cfg)
 			TextColor3=Color3.fromRGB(238,238,255),TextXAlignment=Enum.TextXAlignment.Left})
 
 		if cfg.Message~="" then
-			local msgLbl=N("TextLabel",{Parent=inner,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,
+			N("TextLabel",{Parent=inner,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,
 				Text=cfg.Message,Font=Enum.Font.GothamMedium,TextSize=12,
 				TextColor3=Color3.fromRGB(150,155,195),TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true})
 		end
@@ -239,7 +238,7 @@ function ZNX:Notify(cfg)
 end
 
 -- ═══════════════════════════════════════════════════════════════
--- PACKET DETECTOR MELHORADO
+-- PACKET DETECTOR
 -- ═══════════════════════════════════════════════════════════════
 local PacketDetector = {
 	Active = false,
@@ -248,7 +247,6 @@ local PacketDetector = {
 	BYTE_THRESHOLD = 5 * 1024,
 	COOLDOWN = 30,
 	lastNotify = 0,
-	DetectedRemotes = {},
 }
 
 function PacketDetector:shortenString(str)
@@ -290,7 +288,7 @@ function PacketDetector:resolveSender(args)
 			end
 		end
 	end
-	return LocalPlayer
+	return LP
 end
 
 function PacketDetector:compressArgs(args)
@@ -300,24 +298,23 @@ function PacketDetector:compressArgs(args)
 	for _, v in ipairs(args) do
 		local key
 		if typeof(v) == "string" then
-			key = " " .. self:shortenString(v)
+			key = "📝 " .. self:shortenString(v)
 			stringSizes[key] = (stringSizes[key] or 0) + #v
 		elseif typeof(v) == "Instance" then
-			key = " " .. v.ClassName .. "(" .. v.Name .. ")"
+			key = "🔧 " .. v.ClassName .. "(" .. v.Name .. ")"
 		elseif typeof(v) == "table" then
-			key = " " .. self:summarizeTable(v)
+			key = "📦 " .. self:summarizeTable(v)
 		elseif typeof(v) == "number" then
-			key = " " .. string.format("%.2f", v)
+			key = "🔢 " .. string.format("%.2f", v)
 		else
-			key = " " .. typeof(v) .. ":" .. tostring(v):sub(1, 50)
+			key = "📄 " .. typeof(v) .. ":" .. tostring(v):sub(1, 50)
 		end
 		table.insert(summary, key)
 	end
 	
-	-- Adiciona info de tamanho das strings
 	for k, size in pairs(stringSizes) do
 		if size > 500 then
-			table.insert(summary, "porra " .. k .. " (" .. string.format("%.2f", size/1024) .. " KB)")
+			table.insert(summary, "⚠️ " .. k .. " (" .. string.format("%.2f", size/1024) .. " KB)")
 		end
 	end
 	
@@ -327,11 +324,11 @@ end
 function PacketDetector:showNotification(sender, mbSize, args, remoteName)
 	local summarized = self:compressArgs(args)
 	local msgLines = {
-		". " .. sender.DisplayName .. " (@" .. sender.Name .. ")",
-		". " .. string.format("%.3f MB", mbSize),
-		" ." .. remoteName,
+		"👤 " .. sender.DisplayName .. " (@" .. sender.Name .. ")",
+		"📦 " .. string.format("%.3f MB", mbSize),
+		"🎯 " .. remoteName,
 		"",
-		" ARGUMENTOS:",
+		"📋 ARGUMENTOS:",
 	}
 	
 	for i, line in ipairs(summarized) do
@@ -352,7 +349,6 @@ function PacketDetector:showNotification(sender, mbSize, args, remoteName)
 		Aura = true,
 	})
 	
-	-- Efeito visual extra para detecções grandes
 	if mbSize > 1 then
 		task.spawn(function()
 			local screenFlash = N("Frame", {Parent=Root, Size=UDim2.new(1,0,1,0), BackgroundColor3=Color3.fromRGB(255,50,50), BackgroundTransparency=0.8, BorderSizePixel=0})
@@ -366,16 +362,15 @@ end
 function PacketDetector:start()
 	if self.Connection then return end
 	
-	-- Procura pelo remote específico
 	local grabEvents = game:GetService("ReplicatedStorage"):FindFirstChild("GrabEvents")
 	if not grabEvents then
-		ZNX:Notify({Title=" Detector", Message="Remote 'GrabEvents' não encontrado", Duration=3, Type="warn"})
+		ZNX:Notify({Title="⚠️ Detector", Message="Remote 'GrabEvents' não encontrado", Duration=3, Type="warn"})
 		return
 	end
 	
 	local extendGrabLine = grabEvents:FindFirstChild("ExtendGrabLine")
 	if not extendGrabLine then
-		ZNX:Notify({Title=" Detector", Message="Remote 'ExtendGrabLine' não encontrado", Duration=3, Type="warn"})
+		ZNX:Notify({Title="⚠️ Detector", Message="Remote 'ExtendGrabLine' não encontrado", Duration=3, Type="warn"})
 		return
 	end
 	
@@ -384,14 +379,11 @@ function PacketDetector:start()
 		
 		local args = { ... }
 		local totalBytes = 0
-		local stringCount = 0
 		
 		for _, v in ipairs(args) do
 			if typeof(v) == "string" then
 				totalBytes += #v
-				stringCount += 1
 			elseif typeof(v) == "table" then
-				-- Estimativa para tabelas
 				totalBytes += #HTTP:JSONEncode(v)
 			end
 		end
@@ -407,7 +399,7 @@ function PacketDetector:start()
 	end)
 	
 	self.Active = true
-	ZNX:Notify({Title=" Packet Detector", Message="Ativo - Monitorando pacotes suspeitos", Duration=3, Type="ok"})
+	ZNX:Notify({Title="🔍 Packet Detector", Message="Ativo - Monitorando pacotes suspeitos", Duration=3, Type="ok"})
 end
 
 function PacketDetector:stop()
@@ -416,7 +408,7 @@ function PacketDetector:stop()
 		self.Connection = nil
 	end
 	self.Active = false
-	ZNX:Notify({Title=" Packet Detector", Message="Desativado", Duration=2, Type="info"})
+	ZNX:Notify({Title="🔍 Packet Detector", Message="Desativado", Duration=2, Type="info"})
 end
 
 -- ═══════════════════════════════════════════════════════════════
@@ -491,7 +483,6 @@ function ZNX:MakeWindow(wCfg)
 	local AllTabs={}; local AllElems={}; local firstTab=true
 	local SW,TH=T.SW,T.TH
 
-	-- JANELA
 	local Win=N("Frame",{Parent=Root,
 		Size=UDim2.new(0,wCfg.Size.X,0,wCfg.Size.Y),
 		Position=UDim2.new(.5,-wCfg.Size.X/2,.5,-wCfg.Size.Y/2),
@@ -502,7 +493,6 @@ function ZNX:MakeWindow(wCfg)
 	B(Win,"BackgroundColor3","Bg0")
 	table.insert(ZNX.Watch,function() local s=Win:FindFirstChildOfClass("UIStroke"); if s then s.Color=ZNX.Theme.A end end)
 
-	-- Background image
 	local BgImg=N("ImageLabel",{Parent=Win,ZIndex=1,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,
 		Image=wCfg.BgImage~="" and "rbxassetid://"..wCfg.BgImage or "",
 		ImageTransparency=wCfg.BgImageAlpha,ScaleType=Enum.ScaleType.Crop})
@@ -510,7 +500,6 @@ function ZNX:MakeWindow(wCfg)
 		BackgroundColor3=Color3.fromRGB(0,0,0),
 		BackgroundTransparency=wCfg.BgImage~="" and 0.38 or 1,BorderSizePixel=0})
 
-	-- SIDEBAR
 	local Sidebar=N("Frame",{Parent=Win,ZIndex=10,Position=UDim2.new(0,0,0,0),
 		Size=UDim2.new(0,SW,1,0),BackgroundColor3=T.Bg1,BorderSizePixel=0})
 	B(Sidebar,"BackgroundColor3","Bg1")
@@ -564,7 +553,6 @@ function ZNX:MakeWindow(wCfg)
 		BackgroundTransparency=1,Text="@"..LP.Name,Font=Enum.Font.GothamMedium,TextSize=11,
 		TextColor3=T.TxC,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd})
 
-	-- TOPBAR
 	local TopBar=N("Frame",{Parent=Win,ZIndex=12,
 		Position=UDim2.new(0,SW,0,0),Size=UDim2.new(1,-SW,0,TH),
 		BackgroundColor3=T.Bg1,BorderSizePixel=0})
@@ -676,9 +664,6 @@ function ZNX:MakeWindow(wCfg)
 		end)
 	else Win.Visible=true; Modal.Visible=true; Modal.Modal=true; UIS.MouseIconEnabled=true end
 
-	-- ═══════════════════════════════════════════════════════
-	-- MAKE TAB
-	-- ═══════════════════════════════════════════════════════
 	local TabFn={}
 
 	function TabFn:MakeTab(tCfg)
@@ -741,14 +726,6 @@ function ZNX:MakeWindow(wCfg)
 			local E={}; secName=secName or ""
 			local function reg(f,lbl) table.insert(AllElems,{frame=f,label=lbl,tabName=tCfg.Name,sec=secName}) end
 
-			local function CardHover(c)
-				local s=c:FindFirstChildOfClass("UIStroke")
-				return function(on)
-					Tw(c,TI.Fast,{BackgroundColor3=on and ZNX.Theme.Bg3 or ZNX.Theme.Bg2})
-					if s then Tw(s,TI.Fast,{Transparency=on and 0.45 or 0.88}) end
-				end
-			end
-
 			function E:AddLabel(text)
 				local f=N("TextLabel",{Parent=par,Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,
 					Text=text or "",Font=Enum.Font.GothamMedium,TextSize=13,TextColor3=ZNX.Theme.TxB,TextXAlignment=Enum.TextXAlignment.Left})
@@ -760,7 +737,7 @@ function ZNX:MakeWindow(wCfg)
 				local c=MkCard(par,0); c.AutomaticSize=Enum.AutomaticSize.Y; c.Size=UDim2.new(1,0,0,0)
 				N("UIPadding",{Parent=c,PaddingLeft=UDim.new(0,16),PaddingRight=UDim.new(0,16),PaddingTop=UDim.new(0,12),PaddingBottom=UDim.new(0,12)})
 				N("UIListLayout",{Parent=c,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,5)})
-				N("Frame",{Parent=c,Size=UDim2.new(1,0,0,2),BackgroundColor3=ZNX.Theme.A,BorderSizePixel=0}); B(N("Frame",{Parent=c,Size=UDim2.new(0,0,0,0)}),"BackgroundColor3","A")
+				N("Frame",{Parent=c,Size=UDim2.new(1,0,0,2),BackgroundColor3=ZNX.Theme.A,BorderSizePixel=0})
 				local h=N("TextLabel",{Parent=c,Size=UDim2.new(1,0,0,18),BackgroundTransparency=1,Text=title or "",Font=Enum.Font.GothamBold,TextSize=14,TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Left}); B(h,"TextColor3","TxA")
 				local b=N("TextLabel",{Parent=c,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Text=body or "",Font=Enum.Font.GothamMedium,TextSize=13,TextWrapped=true,TextColor3=ZNX.Theme.TxB,TextXAlignment=Enum.TextXAlignment.Left}); B(b,"TextColor3","TxB")
 				reg(c,title or "paragraph")
@@ -931,7 +908,7 @@ function ZNX:MakeWindow(wCfg)
 			end
 
 			-- ═══════════════════════════════════════════════════════════════
-			-- PLAYERS DROPDOWN MELHORADO COM PERSISTÊNCIA
+			-- PLAYERS DROPDOWN COM PERSISTÊNCIA INTELIGENTE (CORRIGIDO)
 			-- ═══════════════════════════════════════════════════════════════
 			function E:AddPlayersDropdown(dCfg)
 				dCfg = dCfg or {}
@@ -947,8 +924,8 @@ function ZNX:MakeWindow(wCfg)
 					Type = "PlayersDropdown",
 					Save = dCfg.Save,
 					MultipleSelection = dCfg.MultipleSelection,
-					SelectedPlayers = {},  -- Armazena os nomes dos jogadores selecionados
-					SavedSelections = {},   -- Persistência para quando jogadores saem
+					SelectedPlayers = {},      -- Jogadores atualmente selecionados (conectados)
+					PendingReconnect = {},     -- Jogadores que saíram e devem ser re-selecionados
 				}
 				
 				local MaxEl, Opts, tog = 3, 0, false
@@ -966,12 +943,10 @@ function ZNX:MakeWindow(wCfg)
 					return ch.Parent and ch.Parent:IsA("Folder")
 				end
 				
-				-- Função para atualizar o texto do dropdown baseado nos selecionados
 				local function UpdateSelectedText()
 					local txt = ""
 					local playersToShow = {}
 					
-					-- Mostra até 3 jogadores selecionados
 					for i, playerName in ipairs(DD.SelectedPlayers) do
 						if i <= 3 then
 							table.insert(playersToShow, playerName)
@@ -989,7 +964,6 @@ function ZNX:MakeWindow(wCfg)
 					dCfg.Callback(DD.SelectedPlayers)
 				end
 				
-				-- Aplica estilo visual ao botão baseado no estado de seleção
 				local function ApplySel(btn, sel)
 					local sb = btn:FindFirstChild("SB")
 					if sel then
@@ -1011,34 +985,59 @@ function ZNX:MakeWindow(wCfg)
 					end
 				end
 				
-				-- Restaura seleções salvas quando um jogador reconecta
-				local function RestorePlayerSelection(playerName)
-					if DD.SavedSelections[playerName] then
-						if DD.MultipleSelection then
-							if not table.find(DD.SelectedPlayers, playerName) then
-								table.insert(DD.SelectedPlayers, playerName)
-								UpdateSelectedText()
-							end
-						else
-							DD.SelectedPlayers = {playerName}
+				-- Adiciona à seleção (apenas se conectado)
+				local function AddToSelection(playerName)
+					local player = Players:FindFirstChild(playerName)
+					if not player then
+						-- Se não tá online, coloca na lista de pendentes
+						if not DD.PendingReconnect[playerName] then
+							DD.PendingReconnect[playerName] = true
+						end
+						return
+					end
+					
+					if DD.MultipleSelection then
+						if not table.find(DD.SelectedPlayers, playerName) then
+							table.insert(DD.SelectedPlayers, playerName)
 							UpdateSelectedText()
 						end
-						DD.SavedSelections[playerName] = nil -- Remove da lista de espera
-						return true
+					else
+						for _, name in ipairs(DD.SelectedPlayers) do
+							local oldBtn = DD.Buttons[name]
+							if oldBtn and not oldBtn:GetAttribute("DC") then
+								ApplySel(oldBtn, false)
+							end
+						end
+						DD.SelectedPlayers = {playerName}
+						UpdateSelectedText()
 					end
-					return false
+					
+					DD.PendingReconnect[playerName] = nil
 				end
 				
-				-- Remove jogador (desconectado)
-				local function RemovePlayer(playerName)
+				-- Remove da seleção
+				local function RemoveFromSelection(playerName)
 					local idx = table.find(DD.SelectedPlayers, playerName)
 					if idx then
 						table.remove(DD.SelectedPlayers, idx)
 						UpdateSelectedText()
 					end
+					DD.PendingReconnect[playerName] = nil
+				end
+				
+				-- Jogador saiu
+				local function OnPlayerLeft(playerName)
+					local wasSelected = table.find(DD.SelectedPlayers, playerName) ~= nil
 					
-					-- Salva para restaurar quando voltar
-					DD.SavedSelections[playerName] = true
+					if wasSelected then
+						local idx = table.find(DD.SelectedPlayers, playerName)
+						if idx then
+							table.remove(DD.SelectedPlayers, idx)
+							UpdateSelectedText()
+						end
+						-- Marca pra reconectar
+						DD.PendingReconnect[playerName] = true
+					end
 					
 					local btn = DD.Buttons[playerName]
 					if btn and btn.Parent then
@@ -1050,14 +1049,14 @@ function ZNX:MakeWindow(wCfg)
 								Tw(l, TI.Fast, {TextColor3 = Color3.fromRGB(195, 85, 85)})
 							end
 						end
-						if not btn:FindFirstChild("KitouLbl") then
+						if not btn:FindFirstChild("OfflineLbl") then
 							N("TextLabel", {
 								Parent = btn,
-								Name = "KitouLbl",
+								Name = "OfflineLbl",
 								Position = UDim2.new(1, -80, 0.5, -9),
 								Size = UDim2.new(0, 58, 0, 18),
 								BackgroundTransparency = 1,
-								Text = "desconectado",
+								Text = "offline",
 								Font = Enum.Font.GothamBlack,
 								TextSize = 10,
 								TextColor3 = Color3.fromRGB(230, 55, 55),
@@ -1068,58 +1067,47 @@ function ZNX:MakeWindow(wCfg)
 					end
 				end
 				
-				-- Adiciona um jogador à lista
-				local function AddPlayerToSelection(playerName)
-					if DD.MultipleSelection then
-						if not table.find(DD.SelectedPlayers, playerName) then
-							table.insert(DD.SelectedPlayers, playerName)
-							UpdateSelectedText()
+				-- Jogador reconectou
+				local function OnPlayerReconnect(playerName)
+					local btn = DD.Buttons[playerName]
+					
+					if DD.PendingReconnect[playerName] then
+						-- Re-seleciona automaticamente!
+						AddToSelection(playerName)
+						DD.PendingReconnect[playerName] = nil
+						
+						if btn then
+							btn:SetAttribute("DC", false)
+							local di = btn:FindFirstChild("DisIco")
+							if di then di.Visible = false end
+							local offLbl = btn:FindFirstChild("OfflineLbl")
+							if offLbl then offLbl:Destroy() end
+							
+							local isSelected = table.find(DD.SelectedPlayers, playerName) ~= nil
+							ApplySel(btn, isSelected)
 						end
 					else
-						-- Limpa seleções anteriores para seleção única
-						for _, name in ipairs(DD.SelectedPlayers) do
-							local oldBtn = DD.Buttons[name]
-							if oldBtn and not oldBtn:GetAttribute("DC") then
-								ApplySel(oldBtn, false)
-							end
+						if btn then
+							btn:SetAttribute("DC", false)
+							local di = btn:FindFirstChild("DisIco")
+							if di then di.Visible = false end
+							local offLbl = btn:FindFirstChild("OfflineLbl")
+							if offLbl then offLbl:Destroy() end
+							ApplySel(btn, false)
 						end
-						DD.SelectedPlayers = {playerName}
-						UpdateSelectedText()
 					end
 				end
 				
-				-- Remove jogador da seleção
-				local function RemovePlayerFromSelection(playerName)
-					local idx = table.find(DD.SelectedPlayers, playerName)
-					if idx then
-						table.remove(DD.SelectedPlayers, idx)
-						UpdateSelectedText()
-					end
-				end
-				
-				-- Adiciona um novo jogador ao dropdown
+				-- Adiciona opção do jogador
 				local function AddPlayerOption(p)
 					local pn = p.Name
 					local pd = p.DisplayName
 					local uid = p.UserId
 					
-					-- Verifica se já existe e se está marcado como desconectado
 					local existingBtn = DD.Buttons[pn]
 					if existingBtn then
 						if existingBtn:GetAttribute("DC") then
-							-- Jogador reconectou, restaurar estado
-							existingBtn:SetAttribute("DC", false)
-							local di = existingBtn:FindFirstChild("DisIco")
-							if di then di.Visible = false end
-							local kl = existingBtn:FindFirstChild("KitouLbl")
-							if kl then kl:Destroy() end
-							
-							-- Restaura seleção se necessário
-							if RestorePlayerSelection(pn) then
-								ApplySel(existingBtn, true)
-							else
-								ApplySel(existingBtn, false)
-							end
+							OnPlayerReconnect(pn)
 						end
 						return
 					end
@@ -1127,11 +1115,10 @@ function ZNX:MakeWindow(wCfg)
 					local isSelected = table.find(DD.SelectedPlayers, pn) ~= nil
 					local inFolder = IsInFolder(p)
 					
-					-- Se o jogador estava salvo para reconexão, marca como selecionado
-					if DD.SavedSelections[pn] then
+					if DD.PendingReconnect[pn] then
 						isSelected = true
 						table.insert(DD.SelectedPlayers, pn)
-						DD.SavedSelections[pn] = nil
+						DD.PendingReconnect[pn] = nil
 						UpdateSelectedText()
 					end
 					
@@ -1193,7 +1180,7 @@ function ZNX:MakeWindow(wCfg)
 					end
 					
 					local nc = inFolder and Color3.fromRGB(60, 165, 255) or (isSelected and ZNX.Theme.A or Color3.fromRGB(232, 235, 252))
-					local nL = N("TextLabel", {
+					N("TextLabel", {
 						Parent = ob,
 						Name = "NL",
 						Position = UDim2.new(0, 54, 0, 9),
@@ -1220,7 +1207,6 @@ function ZNX:MakeWindow(wCfg)
 						TextTruncate = Enum.TextTruncate.AtEnd
 					})
 					
-					-- Atualiza ícone de pasta periodicamente
 					task.spawn(function()
 						while ob and ob.Parent do
 							task.wait(2)
@@ -1236,7 +1222,8 @@ function ZNX:MakeWindow(wCfg)
 					
 					C(ob.MouseButton1Up, function()
 						if ob:GetAttribute("DC") then
-							RemovePlayerFromSelection(pn)
+							DD.PendingReconnect[pn] = nil
+							RemoveFromSelection(pn)
 							ob:Destroy()
 							DD.Buttons[pn] = nil
 							Opts = Opts - 1
@@ -1267,46 +1254,26 @@ function ZNX:MakeWindow(wCfg)
 					Opts = Opts + 1
 				end
 				
-				-- Inicializa com todos os jogadores atuais
+				-- Inicializa
 				for _, p in pairs(Players:GetPlayers()) do
 					if p ~= LP then
 						AddPlayerOption(p)
 					end
 				end
 				
-				-- Evento de novo jogador
 				C(Players.PlayerAdded, function(p)
 					if p ~= LP then
 						AddPlayerOption(p)
 					end
 				end)
 				
-				-- Evento de jogador saindo
 				C(Players.PlayerRemoving, function(p)
 					task.delay(0.1, function()
-						RemovePlayer(p.Name)
+						OnPlayerLeft(p.Name)
 					end)
 				end)
 				
-				-- Limpa botões desconectados
-				local function CleanDC()
-					for n, btn in pairs(DD.Buttons) do
-						if btn and btn:GetAttribute("DC") then
-							local idx = table.find(DD.SelectedPlayers, n)
-							if idx then
-								table.remove(DD.SelectedPlayers, idx)
-							end
-							btn:Destroy()
-							DD.Buttons[n] = nil
-							Opts = Opts - 1
-						end
-					end
-					UpdateSelectedText()
-				end
-				
-				function DD:Refresh()
-					-- Mantém os jogadores atuais, apenas atualiza
-				end
+				function DD:Refresh() end
 				
 				function DD:Set(val, once)
 					local btn = DD.Buttons[val]
@@ -1320,29 +1287,37 @@ function ZNX:MakeWindow(wCfg)
 						end
 					end
 					
-					if not btn or btn:GetAttribute("DC") then return end
+					if not btn then return end
+					
+					if btn:GetAttribute("DC") then
+						ZNX:Notify({
+							Title = "⚠️ Jogador Offline",
+							Message = val .. " está offline",
+							Duration = 2,
+							Type = "warn"
+						})
+						return
+					end
 					
 					local isSelected = table.find(DD.SelectedPlayers, val) ~= nil
 					
 					if DD.MultipleSelection then
 						if not isSelected then
-							AddPlayerToSelection(val)
+							AddToSelection(val)
 							ApplySel(btn, true)
 						elseif not once then
-							RemovePlayerFromSelection(val)
+							RemoveFromSelection(val)
 							ApplySel(btn, false)
 						end
 					else
-						-- Seleção única
 						if not isSelected then
-							-- Remove seleção anterior
 							for _, name in ipairs(DD.SelectedPlayers) do
 								local oldBtn = DD.Buttons[name]
 								if oldBtn and not oldBtn:GetAttribute("DC") then
 									ApplySel(oldBtn, false)
 								end
 							end
-							AddPlayerToSelection(val)
+							AddToSelection(val)
 							ApplySel(btn, true)
 						end
 					end
@@ -1351,7 +1326,6 @@ function ZNX:MakeWindow(wCfg)
 					if DD.Save then SaveCfg(wCfg.ConfigName) end
 				end
 				
-				-- Toggle do dropdown
 				C(hb.MouseButton1Up, function()
 					DD.Toggled = not DD.Toggled
 					sep.Visible = DD.Toggled
@@ -1366,7 +1340,6 @@ function ZNX:MakeWindow(wCfg)
 				return DD
 			end
 			
-			-- PLAYER DROPDOWN simples (mantido igual ao original)
 			function E:AddPlayerDropdown(pdCfg)
 				pdCfg=pdCfg or{}; pdCfg.Name=pdCfg.Name or "Jogadores"; pdCfg.Callback=pdCfg.Callback or function()end; pdCfg.Flag=pdCfg.Flag or nil; pdCfg.Save=pdCfg.Save or false
 				local DD={Value=nil,Buttons={},SelP={},Type="PlayerDropdown",Save=pdCfg.Save}; local MaxEl,tog=5,false
@@ -1530,18 +1503,18 @@ function ZNX:MakeWindow(wCfg)
 					if nome=="" or id2=="" then ZNX:Notify({Title="Campos Vazios",Message="Preencha nome e ID.",Duration=3,Type="warn"}); return end
 					for _,img in ipairs(saved) do if tostring(img.id)==id2 then ZNX:Notify({Title="Duplicado",Message="ID ja salvo: "..img.name,Duration=3,Type="warn"}); return end end
 					table.insert(saved,{name=nome,id=id2}); SvImg(); nameIn.Text=""; idIn.Text=""; ReBuild(); ZNX:Notify({Title="Salva",Message=nome.." · "..id2,Duration=3,Type="ok"})
-                    				end)
+				end)
 				reg(outer,imgCfg.Name); return{Rebuild=ReBuild}
 			end
 
 			return E
-		end -- BuildElem
+		end
 
 		local EF={}; for k2,v2 in pairs(BuildElem(CS,"")) do EF[k2]=v2 end; return EF
-	end -- MakeTab
+	end
 
 	-- ═══════════════════════════════════════════════════════
-	-- ABA SETTINGS (com Packet Detector)
+	-- ABA SETTINGS
 	-- ═══════════════════════════════════════════════════════
 	local function BuildSettings()
 		local ST = TabFn:MakeTab({Name = "⚙️ Settings"})
@@ -1579,21 +1552,17 @@ function ZNX:MakeWindow(wCfg)
 		BT:AddColorpicker({Name = "Texto secundário", Default = ZNX.Theme.TxB, ThemeKey = "TxB", Callback = function(c) ZNX:SetColor("TxB", c) end})
 		BT:AddColorpicker({Name = "Bordas", Default = ZNX.Theme.Line, ThemeKey = "Line", Callback = function(c) ZNX:SetColor("Line", c) end})
 
-		-- ═══════════════════════════════════════════════════════════════
 		-- SEÇÃO DE SEGURANÇA - PACKET DETECTOR
-		-- ═══════════════════════════════════════════════════════════════
 		local Security = ST:AddSection({Name = "🛡️ Segurança"})
 		
-		-- Descrição do detector
 		Security:AddParagraph("Packet Detector", [[
- Monitora pacotes suspeitos enviados pelo servidor.
- Detecta transferências anormais de dados e possíveis exploits.
- Aura visual e notificações detalhadas quando algo suspeito é encontrado.
+🔍 Monitora pacotes suspeitos enviados pelo servidor.
+⚠️ Detecta transferências anormais de dados e possíveis exploits.
+⚡ Aura visual e notificações detalhadas quando algo suspeito é encontrado.
 		]])
 		
-		-- Toggle principal do detector
 		local packetToggle = Security:AddToggle({
-			Name = " Detectar Pacotes Suspeitos",
+			Name = "🔍 Detectar Pacotes Suspeitos",
 			Default = false,
 			Save = true,
 			Flag = "PacketDetector",
@@ -1606,10 +1575,8 @@ function ZNX:MakeWindow(wCfg)
 			end
 		})
 		
-		-- Configurações avançadas do detector
 		local AdvSecurity = ST:AddSection({Name = "⚙️ Configurações Avançadas"})
 		
-		-- Threshold de tamanho (KB)
 		local kbSlider = AdvSecurity:AddSlider({
 			Name = "Limite de tamanho (KB)",
 			Min = 1,
@@ -1627,7 +1594,6 @@ function ZNX:MakeWindow(wCfg)
 		})
 		kbSlider:Set(PacketDetector.KB_THRESHOLD)
 		
-		-- Cooldown entre notificações
 		local cooldownSlider = AdvSecurity:AddSlider({
 			Name = "Cooldown entre alertas",
 			Min = 5,
@@ -1644,21 +1610,16 @@ function ZNX:MakeWindow(wCfg)
 		})
 		cooldownSlider:Set(PacketDetector.COOLDOWN)
 		
-		-- Botão para testar o detector
 		AdvSecurity:AddButton({
-			Name = " Testar Detector",
+			Name = "🧪 Testar Detector",
 			Callback = function()
-				-- Simula um pacote de teste
-				local testData = string.rep("A", 10 * 1024) -- 10KB de dados de teste
+				local testData = string.rep("A", 10 * 1024)
 				ZNX:Notify({
-					Title = " Teste do Detector",
-					Message = "Simulando pacote de " .. string.format("%.2f", 10 / 1024) .. " MB\n" ..
-							  "Se o detector estiver ativo, você deve ver um alerta em breve.",
+					Title = "🔍 Teste do Detector",
+					Message = "Simulando pacote de " .. string.format("%.2f", 10 / 1024) .. " MB\nSe o detector estiver ativo, você deve ver um alerta em breve.",
 					Duration = 5,
 					Type = "warn"
 				})
-				
-				-- Simula o evento (apenas para teste visual)
 				task.spawn(function()
 					task.wait(0.5)
 					PacketDetector:showNotification(
@@ -1671,7 +1632,7 @@ function ZNX:MakeWindow(wCfg)
 			end
 		})
 
-		local PS = ST:AddSection({Name = " Presets"})
+		local PS = ST:AddSection({Name = "🎨 Presets"})
 		local Presets = {
 			["Obsidian (padrão)"] = {Bg0 = Color3.fromRGB(4, 4, 6), Bg1 = Color3.fromRGB(7, 7, 12), Bg2 = Color3.fromRGB(10, 10, 17), A = Color3.fromRGB(0, 210, 255), A2 = Color3.fromRGB(255, 50, 180), Line = Color3.fromRGB(24, 24, 40)},
 			["Crimson Night"] = {Bg0 = Color3.fromRGB(5, 2, 2), Bg1 = Color3.fromRGB(9, 4, 4), Bg2 = Color3.fromRGB(15, 7, 7), A = Color3.fromRGB(230, 45, 60), A2 = Color3.fromRGB(255, 100, 40), Line = Color3.fromRGB(44, 14, 14)},
@@ -1698,7 +1659,7 @@ function ZNX:MakeWindow(wCfg)
 			end})
 		end
 
-		local Cfg = ST:AddSection({Name = " Configuração"})
+		local Cfg = ST:AddSection({Name = "💾 Configuração"})
 		Cfg:AddButton({Name = "Salvar configuração", Callback = function()
 			sDb = 0
 			SaveCfg(wCfg.ConfigName)
@@ -1721,7 +1682,7 @@ function ZNX:MakeWindow(wCfg)
 		end})
 		Cfg:AddBind({Name = "Tecla toggle", Default = Enum.KeyCode[wCfg.ToggleKey] or Enum.KeyCode.M, Callback = function() end})
 
-		local ImgS = ST:AddSection({Name = " Imagens salvas"})
+		local ImgS = ST:AddSection({Name = "🖼️ Imagens salvas"})
 		ImgS:AddImageDropdown({Name = "Gerenciar imagens", SaveKey = "__ZNX5Bg", OnApply = function(id)
 			wCfg.BgImage = id
 			BgImg.Image = "rbxassetid://" .. id
@@ -1729,19 +1690,18 @@ function ZNX:MakeWindow(wCfg)
 			ZNX:Notify({Title = "Imagem aplicada", Duration = 3, Type = "ok"})
 		end})
 
-		local Info = ST:AddSection({Name = " Sessão"})
-		Info:AddLabel(" Jogador: " .. LP.DisplayName .. " (@" .. LP.Name .. ")")
-		Info:AddLabel(" UID: " .. LP.UserId)
-		Info:AddLabel(" ZNXHUB v5.1 · Obsidian + Packet Shield")
-		Info:AddLabel(" Packet Detector: " .. (PacketDetector.Active and " Ativo" or " Inativo"))
+		local Info = ST:AddSection({Name = "ℹ️ Sessão"})
+		Info:AddLabel("👤 Jogador: " .. LP.DisplayName .. " (@" .. LP.Name .. ")")
+		Info:AddLabel("🆔 UID: " .. LP.UserId)
+		Info:AddLabel("🔧 ZNXHUB v5.1 · Obsidian + Packet Shield")
+		Info:AddLabel("🛡️ Packet Detector: " .. (PacketDetector.Active and "✅ Ativo" or "❌ Inativo"))
 		
-		-- Atualiza status do detector na interface
 		task.spawn(function()
 			while Alive() do
 				task.wait(2)
 				for _, lbl in ipairs(Info:GetChildren()) do
 					if lbl:IsA("TextLabel") and lbl.Text:find("Packet Detector") then
-						lbl.Text = " Packet Detector: " .. (PacketDetector.Active and " Ativo" or " Inativo")
+						lbl.Text = "🛡️ Packet Detector: " .. (PacketDetector.Active and "✅ Ativo" or "❌ Inativo")
 					end
 				end
 			end
