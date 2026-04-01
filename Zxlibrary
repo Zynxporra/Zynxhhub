@@ -1,11 +1,3 @@
---[[
-  ╔══════════════════════════════════════════════════════════════╗
-  ║  ZNXHUB  v5.1  ·  OBSIDIAN + PACKET DETECTOR                ║
-  ║  Melhorias: PlayerDropdown persistente · Detector visual    ║
-  ║  Design: obsidian preto · accent neon · glass cards         ║
-  ╚══════════════════════════════════════════════════════════════╝
-]]
-
 if _G.__ZNX5 then warn("[ZNXHUB] Já rodando.") return end
 _G.__ZNX5 = true
 
@@ -53,27 +45,27 @@ local Modal = N("TextButton",{Size=UDim2.new(0,0,0,0),BackgroundTransparency=1,T
 
 -- PALETA OBSIDIAN
 local DT = {
-	Bg0   = Color3.fromRGB(4,   4,   6),
-	Bg1   = Color3.fromRGB(7,   7,  12),
-	Bg2   = Color3.fromRGB(10,  10,  17),
-	Bg3   = Color3.fromRGB(14,  14,  23),
-	Bg4   = Color3.fromRGB(18,  18,  30),
-	BgI   = Color3.fromRGB(6,   6,  10),
-	Line  = Color3.fromRGB(24,  24,  40),
-	A     = Color3.fromRGB(0,   210, 255),
-	ADim  = Color3.fromRGB(0,    65,  95),
-	ABr   = Color3.fromRGB(100, 235, 255),
-	ASel  = Color3.fromRGB(0,    30,  48),
-	A2    = Color3.fromRGB(255,  50, 180),
-	A2Dim = Color3.fromRGB( 80,  10,  55),
-	Ok    = Color3.fromRGB(40,  210,  90),
-	Err   = Color3.fromRGB(230,  55,  55),
-	Warn  = Color3.fromRGB(255, 185,  30),
-	TxA   = Color3.fromRGB(236, 238, 255),
-	TxB   = Color3.fromRGB(120, 125, 165),
-	TxC   = Color3.fromRGB( 50,  52,  82),
-	Scr   = Color3.fromRGB(0,  210, 255),
-	SW    = 192,
+	Bg0   = Color3.fromRGB(10,  8,  28),
+	Bg1   = Color3.fromRGB(18,  16, 44),
+	Bg2   = Color3.fromRGB(28,  24, 68),
+	Bg3   = Color3.fromRGB(34,  30, 86),
+	Bg4   = Color3.fromRGB(45,  38,114),
+	BgI   = Color3.fromRGB(18,  14, 40),
+	Line  = Color3.fromRGB(78,  56, 155),
+	A     = Color3.fromRGB(158, 101, 255),
+	ADim  = Color3.fromRGB(78,  49, 164),
+	ABr   = Color3.fromRGB(200, 130, 255),
+	ASel  = Color3.fromRGB(35,  18,  70),
+	A2    = Color3.fromRGB(82,  53, 219),
+	A2Dim = Color3.fromRGB(48,  28, 126),
+	Ok    = Color3.fromRGB(80,  210, 160),
+	Err   = Color3.fromRGB(255,  95, 115),
+	Warn  = Color3.fromRGB(255, 165,  75),
+	TxA   = Color3.fromRGB(242, 242, 250),
+	TxB   = Color3.fromRGB(165, 164, 206),
+	TxC   = Color3.fromRGB(150, 145, 190),
+	Scr   = Color3.fromRGB(158, 101, 255),
+	SW    = 184,
 	TH    = 44,
 }
 
@@ -506,7 +498,8 @@ function ZNX:MakeWindow(wCfg)
 		Size=UDim2.new(0,1,1,0),BackgroundColor3=T.A,BorderSizePixel=0})
 	B(SideEdge,"BackgroundColor3","A")
 
-	local SideTop=N("Frame",{Parent=Sidebar,ZIndex=11,Size=UDim2.new(1,0,0,TH),BackgroundTransparency=1})
+	local SideTop=N("Frame",{Parent=Sidebar,ZIndex=11,Size=UDim2.new(1,0,0,TH),BackgroundColor3=T.Bg2,BorderSizePixel=0},
+		{N("UICorner",{CornerRadius=UDim.new(0,16)})})
 	local lx=14
 	if wCfg.Icon~="" then
 		N("ImageLabel",{Parent=SideTop,ZIndex=12,Position=UDim2.new(0,12,0.5,-11),Size=UDim2.new(0,22,0,22),BackgroundTransparency=1,Image=wCfg.Icon})
@@ -554,8 +547,8 @@ function ZNX:MakeWindow(wCfg)
 
 	local TopBar=N("Frame",{Parent=Win,ZIndex=12,
 		Position=UDim2.new(0,SW,0,0),Size=UDim2.new(1,-SW,0,TH),
-		BackgroundColor3=T.Bg1,BorderSizePixel=0})
-	B(TopBar,"BackgroundColor3","Bg1")
+		BackgroundColor3=T.Bg2,BorderSizePixel=0})
+	B(TopBar,"BackgroundColor3","Bg2")
 	N("Frame",{Parent=Win,ZIndex=13,Position=UDim2.new(0,SW,0,TH),Size=UDim2.new(1,-SW,0,1),BackgroundColor3=T.Line,BorderSizePixel=0})
 	local AccLine=N("Frame",{Parent=Win,ZIndex=14,Position=UDim2.new(0,SW,0,TH),Size=UDim2.new(1,-SW,0,2),BackgroundColor3=T.A,BorderSizePixel=0})
 	B(AccLine,"BackgroundColor3","A")
@@ -579,9 +572,9 @@ function ZNX:MakeWindow(wCfg)
 	local BG=N("Frame",{Parent=TopBar,ZIndex=13,Position=UDim2.new(1,-82,0.5,-13),Size=UDim2.new(0,74,0,26),BackgroundTransparency=1})
 	local function WBtn(ico,x,hcol)
 		local b=N("TextButton",{Parent=BG,ZIndex=14,Position=UDim2.new(0,x,0,0),Size=UDim2.new(0,26,0,26),
-			BackgroundColor3=T.Bg2,BorderSizePixel=0,Text="",AutoButtonColor=false},{
-			N("UICorner",{CornerRadius=UDim.new(0,6)}),
-			N("UIStroke",{Color=T.Line,Thickness=1}),
+			BackgroundColor3=T.Bg3,BorderSizePixel=0,Text="",AutoButtonColor=false},{
+			N("UICorner",{CornerRadius=UDim.new(0,10)}),
+			N("UIStroke",{Color=T.Line,Thickness=1,Transparency=0.6}),
 			N("ImageLabel",{Size=UDim2.new(0,12,0,12),Position=UDim2.new(0.5,-6,0.5,-6),BackgroundTransparency=1,Image=ico,ImageColor3=T.TxB,Name="Ico",ZIndex=15}),
 		})
 		B(b,"BackgroundColor3","Bg2")
@@ -669,11 +662,11 @@ function ZNX:MakeWindow(wCfg)
 		tCfg=tCfg or{}; tCfg.Name=tCfg.Name or "Tab"; tCfg.Icon=tCfg.Icon or ""
 
 		local TBtn=N("TextButton",{Parent=TabSc,ZIndex=12,
-			Size=UDim2.new(1,0,0,40),
-			BackgroundColor3=ZNX.Theme.Bg1,BackgroundTransparency=0.6,
+			Size=UDim2.new(1,0,0,42),
+			BackgroundColor3=ZNX.Theme.Bg1,BackgroundTransparency=0.55,
 			BorderSizePixel=0,Text="",AutoButtonColor=false},{
-			N("UICorner",{CornerRadius=UDim.new(0,10)}),
-			N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1,Transparency=0.80}),
+			N("UICorner",{CornerRadius=UDim.new(0,12)}),
+			N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1,Transparency=0.65}),
 		})
 		B(TBtn,"BackgroundColor3","Bg1")
 
