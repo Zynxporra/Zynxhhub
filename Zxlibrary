@@ -6,6 +6,7 @@ local TS = game:GetService("TweenService")
 local RS = game:GetService("RunService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HTTP = game:GetService("HttpService")
 local LP = Players.LocalPlayer
 
 local function new(class, props, children)
@@ -57,6 +58,22 @@ local Presets = {
         Error = Color3.fromRGB(245, 100, 135),
         PanelTransparency = 0.32,
         PaneTransparency = 0.18,
+    },
+    Obsidian = {
+        Window = Color3.fromRGB(4, 4, 6),
+        Panel = Color3.fromRGB(10, 10, 17),
+        Pane = Color3.fromRGB(14, 14, 23),
+        Header = Color3.fromRGB(7, 7, 12),
+        Active = Color3.fromRGB(0, 210, 255),
+        Border = Color3.fromRGB(24, 24, 40),
+        Text = Color3.fromRGB(236, 238, 255),
+        SubText = Color3.fromRGB(120, 125, 165),
+        Accent = Color3.fromRGB(100, 235, 255),
+        Success = Color3.fromRGB(40, 210, 90),
+        Warning = Color3.fromRGB(255, 185, 30),
+        Error = Color3.fromRGB(230, 55, 55),
+        PanelTransparency = 0.08,
+        PaneTransparency = 0.04,
     },
 }
 
@@ -164,10 +181,39 @@ local function setTheme(name)
 end
 
 function ZNX:Notify(message, kind)
+    local cfg = {}
+    if type(message) == "table" then
+        cfg = message
+    else
+        cfg.Message = message or ""
+        cfg.Type = kind or "info"
+    end
+
+    local notifType = tostring(cfg.Type or "info"):lower()
     local accent = ZNX.Theme.Active
-    if kind == "success" then accent = ZNX.Theme.Success
-    elseif kind == "warn" then accent = ZNX.Theme.Warning
-    elseif kind == "error" then accent = ZNX.Theme.Error end
+    if notifType == "success" or notifType == "ok" then
+        accent = ZNX.Theme.Success
+    elseif notifType == "warn" or notifType == "warning" then
+        accent = ZNX.Theme.Warning
+    elseif notifType == "error" or notifType == "danger" or notifType == "err" then
+        accent = ZNX.Theme.Error
+    end
+
+    local titleMap = {
+        info = "Info",
+        success = "Sucesso",
+        ok = "Sucesso",
+        warn = "Aviso",
+        warning = "Aviso",
+        error = "Erro",
+        danger = "Perigo",
+        err = "Erro",
+    }
+
+    local title = cfg.Title or titleMap[notifType] or "Aviso"
+    local body = cfg.Message or ""
+    local duration = cfg.Duration or 3.2
+    local aura = cfg.Aura or false
 
     local position = UDim2.new(1, -16, 1, -16)
     local anchor = Vector2.new(1, 1)
@@ -183,37 +229,71 @@ function ZNX:Notify(message, kind)
     end
 
     local notif = new("Frame", {
-        Size = UDim2.new(0, 330, 0, 56),
+        Size = UDim2.new(0, 340, 0, 0),
         Position = position,
         AnchorPoint = anchor,
         BackgroundColor3 = ZNX.Theme.Panel,
         BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
         BorderSizePixel = 0,
         ZIndex = 999,
+        AutomaticSize = Enum.AutomaticSize.Y,
     }, {
-        new("UICorner", {CornerRadius = UDim.new(0, 16)}),
+        new("UICorner", {CornerRadius = UDim.new(0, 18)}),
         new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
-        new("Frame", {
-            Position = UDim2.new(0, 0, 0, 0),
-            Size = UDim2.new(0, 6, 1, 0),
-            BackgroundColor3 = accent,
-            BorderSizePixel = 0,
-        }, {new("UICorner", {CornerRadius = UDim.new(0, 4)})}),
-        new("TextLabel", {
-            Position = UDim2.new(0, 14, 0, 12),
-            Size = UDim2.new(1, -28, 1, -24),
-            BackgroundTransparency = 1,
-            Text = message,
-            Font = Enum.Font.GothamMedium,
-            TextSize = 14,
-            TextColor3 = ZNX.Theme.Text,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            TextYAlignment = Enum.TextYAlignment.Top,
-        }),
     })
+
+    if aura then
+        new("Frame", {
+            Parent = notif,
+            Size = UDim2.new(1, 12, 1, 12),
+            Position = UDim2.new(0, -6, 0, -6),
+            BackgroundColor3 = accent,
+            BackgroundTransparency = 0.88,
+            BorderSizePixel = 0,
+            ZIndex = 0,
+        }, {
+            new("UICorner", {CornerRadius = UDim.new(0, 22)}),
+        })
+    end
+
+    local content = new("Frame", {
+        Parent = notif,
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+    }, {
+        new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6)}),
+        new("UIPadding", {PaddingTop = UDim.new(0, 14), PaddingBottom = UDim.new(0, 14), PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14)}),
+    })
+
+    new("TextLabel", {
+        Parent = content,
+        Size = UDim2.new(1, 0, 0, 22),
+        BackgroundTransparency = 1,
+        Text = title,
+        Font = Enum.Font.GothamBlack,
+        TextSize = 15,
+        TextColor3 = ZNX.Theme.Text,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    })
+
+    if body ~= "" then
+        new("TextLabel", {
+            Parent = content,
+            Size = UDim2.new(1, 0, 0, 0),
+            AutomaticSize = Enum.AutomaticSize.Y,
+            BackgroundTransparency = 1,
+            Text = body,
+            Font = Enum.Font.GothamMedium,
+            TextSize = 13,
+            TextColor3 = ZNX.Theme.SubText,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextWrapped = true,
+        })
+    end
+
     notif.Parent = Root
-    tween(notif, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(1, -16, 1, -16)})
-    task.delay(2.6, function()
+    tween(notif, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = position})
+    task.delay(duration, function()
         tween(notif, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1})
         task.delay(0.22, function() if notif then notif:Destroy() end end)
     end)
@@ -235,6 +315,12 @@ function PacketMonitor:Summarize(value)
     elseif typeof(value) == "Instance" then
         return value.ClassName
     elseif typeof(value) == "table" then
+        local ok, encoded = pcall(function()
+            return HTTP:JSONEncode(value)
+        end)
+        if ok and encoded then
+            return string.format("table(%d bytes)", #encoded)
+        end
         return "table"
     else
         return typeof(value)
@@ -242,30 +328,50 @@ function PacketMonitor:Summarize(value)
 end
 
 function PacketMonitor:Alert(remoteName, total, args)
-    local message = string.format("%s detectado: %.1f KB", remoteName, total / 1024)
-    for i = 1, math.min(3, #args) do
-        message = message .. "\n� " .. self:Summarize(args[i])
+    local summary = {}
+    for i = 1, math.min(4, #args) do
+        table.insert(summary, "• " .. self:Summarize(args[i]))
     end
-    if #args > 3 then
-        message = message .. "\n..."
+    if #args > 4 then
+        table.insert(summary, "• ...")
     end
-    ZNX:Notify(message, "warn")
+
+    ZNX:Notify({
+        Title = "🚨 Packet Shield",
+        Message = string.format("%s detectado: %.2f KB\n%s", remoteName, total / 1024, table.concat(summary, "\n")),
+        Duration = 7,
+        Type = "warn",
+        Aura = true,
+    })
+
+    if total > self.ByteThreshold * 2 then
+        local flash = new("Frame", {
+            Parent = Root,
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundColor3 = ZNX.Theme.Error,
+            BackgroundTransparency = 0.85,
+            BorderSizePixel = 0,
+            ZIndex = 998,
+        })
+        tween(flash, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+        task.delay(0.24, function() if flash then flash:Destroy() end end)
+    end
 end
 
 function PacketMonitor:Start()
     if self.Connection then return end
-    local success, grabEvents = pcall(function()
-        return ReplicatedStorage:WaitForChild("GrabEvents", 5)
-    end)
-    if not success or not grabEvents then
-        ZNX:Notify("GrabEvents n�o encontrado.", "error")
+    local grabEvents = ReplicatedStorage:FindFirstChild("GrabEvents")
+    if not grabEvents then
+        ZNX:Notify({Title = "⚠️ Detector", Message = "GrabEvents não encontrado.", Type = "warn"})
         return
     end
+
     local remote = grabEvents:FindFirstChild("ExtendGrabLine")
     if not remote then
-        ZNX:Notify("ExtendGrabLine n�o encontrado.", "error")
+        ZNX:Notify({Title = "⚠️ Detector", Message = "ExtendGrabLine não encontrado.", Type = "warn"})
         return
     end
+
     self.Connection = remote.OnClientEvent:Connect(function(...)
         if not self.Active then return end
         local args = {...}
@@ -273,16 +379,25 @@ function PacketMonitor:Start()
         for _, value in ipairs(args) do
             if typeof(value) == "string" then
                 total = total + #value
-            elseif typeof(value) == "table" then
-                for _, item in pairs(value) do
-                    if typeof(item) == "string" then
-                        total = total + #item
-                    end
-                end
-            elseif typeof(value) == "Instance" then
-                total = total + 16
             elseif typeof(value) == "number" then
                 total = total + 8
+            elseif typeof(value) == "Instance" then
+                total = total + 16
+            elseif typeof(value) == "table" then
+                local ok, encoded = pcall(function()
+                    return HTTP:JSONEncode(value)
+                end)
+                if ok and encoded then
+                    total = total + #encoded
+                else
+                    for _, item in pairs(value) do
+                        if typeof(item) == "string" then
+                            total = total + #item
+                        elseif typeof(item) == "table" then
+                            total = total + 64
+                        end
+                    end
+                end
             end
         end
         if total < self.ByteThreshold then return end
@@ -290,7 +405,8 @@ function PacketMonitor:Start()
         self.LastAlert = tick()
         self:Alert(remote.Name, total, args)
     end)
-    ZNX:Notify("Packet Shield ativado.", "success")
+    self.Active = true
+    ZNX:Notify({Title = "🔍 Packet Shield", Message = "Ativo - monitorando pacotes suspeitos.", Type = "success", Duration = 3})
 end
 
 function PacketMonitor:Stop()
@@ -952,9 +1068,6 @@ createActionOption(loopsPage, "Aplicar agora", "Force a aplicação imediata das
 end)
 
 local settingsPage = addPage("Settings")
-createThemeButton(settingsPage, "Orion", "Orion")
-createThemeButton(settingsPage, "Glass", "Glass")
-createCard("Notificações", "Escolha a posição onde as mensagens aparecem."):Parent(settingsPage)
 
 setActivePage("Dashboard")
 
@@ -1014,13 +1127,15 @@ end
 
 local themeSection = new("Frame", {
     Parent = settingsPage,
-    Size = UDim2.new(1, 0, 0, 160),
+    Size = UDim2.new(1, 0, 0, 200),
     BackgroundTransparency = 1,
 }, {
     new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)}),
 })
 createThemeButton(themeSection, "Orion", "Orion")
+createThemeButton(themeSection, "Obsidian", "Obsidian")
 createThemeButton(themeSection, "Glass", "Glass")
+createCard("Packet Shield", "Detector visual de pacotes inspirado em Obsidian."):Parent(settingsPage)
 
 local function createNotifyButton(parent, label, value)
     local btn = new("TextButton", {
@@ -1123,5 +1238,49 @@ PacketMonitor:Start()
 ZNX:Notify("Interface Orion carregada.", "success")
 
 function ZNX:MakeWindow() end
+function ZNX:Init() end
+return ZNX
+Name)
+		end})
+		Cfg:AddTextbox({Name = "ID imagem fundo", Default = wCfg.BgImage, Placeholder = "ex: 12345678", Callback = function(id)
+			wCfg.BgImage = id
+			BgImg.Image = id ~= "" and "rbxassetid://" .. id or ""
+			BgDim.BackgroundTransparency = id ~= "" and 0.38 or 1
+			ZNX:Notify({Title = "Fundo", Message = id ~= "" and "Imagem aplicada." or "Imagem removida.", Duration = 3})
+		end})
+		Cfg:AddBind({Name = "Tecla toggle", Default = Enum.KeyCode[wCfg.ToggleKey] or Enum.KeyCode.M, Callback = function() end})
+
+		local ImgS = ST:AddSection({Name = "🖼️ Imagens salvas"})
+		ImgS:AddImageDropdown({Name = "Gerenciar imagens", SaveKey = "__ZNX5Bg", OnApply = function(id)
+			wCfg.BgImage = id
+			BgImg.Image = "rbxassetid://" .. id
+			BgDim.BackgroundTransparency = 0.38
+			ZNX:Notify({Title = "Imagem aplicada", Duration = 3, Type = "ok"})
+		end})
+
+		local Info = ST:AddSection({Name = "ℹ️ Sessão"})
+		Info:AddLabel("👤 Jogador: " .. LP.DisplayName .. " (@" .. LP.Name .. ")")
+		Info:AddLabel("🆔 UID: " .. LP.UserId)
+		Info:AddLabel("🔧 ZNXHUB v5.1 · Obsidian + Packet Shield")
+		Info:AddLabel("🛡️ Packet Detector: " .. (PacketDetector.Active and "✅ Ativo" or "❌ Inativo"))
+		
+		task.spawn(function()
+			while Alive() do
+				task.wait(2)
+				for _, lbl in ipairs(Info:GetChildren()) do
+					if lbl:IsA("TextLabel") and lbl.Text:find("Packet Detector") then
+						lbl.Text = "🛡️ Packet Detector: " .. (PacketDetector.Active and "✅ Ativo" or "❌ Inativo")
+					end
+				end
+			end
+		end)
+	end
+
+	BuildSettings()
+	PacketDetector:start()
+	if wCfg.SaveConfig then task.defer(function() LoadCfg(wCfg.ConfigName) end) end
+	return TabFn
+end
+
 function ZNX:Init() end
 return ZNX
