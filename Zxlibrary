@@ -1,1414 +1,1127 @@
---[[
-  ╔══════════════════════════════════════════════════════════════╗
-  ║  ZNXHUB  v5.2  ·  OBSIDIAN + PACKET DETECTOR                ║
-  ║  Design: Orion Style - Minimalista, reto e elegante         ║
-  ║  Mantendo todas as funcionalidades originais                ║
-  ╚══════════════════════════════════════════════════════════════╝
-]]
-
-if _G.__ZNX5 then warn("[ZNXHUB] Já rodando.") return end
+if _G.__ZNX5 then warn("[ZNXHUB] J� rodando.") return end
 _G.__ZNX5 = true
 
-local UIS     = game:GetService("UserInputService")
-local TS      = game:GetService("TweenService")
-local RS      = game:GetService("RunService")
-local HTTP    = game:GetService("HttpService")
+local UIS = game:GetService("UserInputService")
+local TS = game:GetService("TweenService")
+local RS = game:GetService("RunService")
 local Players = game:GetService("Players")
-local USvc    = game:GetService("UserService")
-local SS      = game:GetService("SoundService")
-local LP      = Players.LocalPlayer
-getgenv().gethui = getgenv().gethui or function() return game.CoreGui end
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LP = Players.LocalPlayer
+
+local function new(class, props, children)
+    local obj = Instance.new(class)
+    for k, v in pairs(props or {}) do obj[k] = v end
+    for _, child in ipairs(children or {}) do child.Parent = obj end
+    return obj
+end
+
+local function tween(obj, info, props)
+    if obj and obj.Parent then
+        TS:Create(obj, info, props):Play()
+    end
+end
+
+local function clamp(val, low, high)
+    return math.max(low, math.min(high, val))
+end
+
+local Presets = {
+    Orion = {
+        Window = Color3.fromRGB(8, 8, 18),
+        Panel = Color3.fromRGB(18, 16, 40),
+        Pane = Color3.fromRGB(24, 20, 56),
+        Header = Color3.fromRGB(14, 12, 38),
+        Active = Color3.fromRGB(148, 102, 255),
+        Border = Color3.fromRGB(84, 65, 179),
+        Text = Color3.fromRGB(240, 240, 250),
+        SubText = Color3.fromRGB(145, 145, 190),
+        Accent = Color3.fromRGB(98, 70, 240),
+        Success = Color3.fromRGB(96, 215, 165),
+        Warning = Color3.fromRGB(255, 180, 90),
+        Error = Color3.fromRGB(235, 95, 120),
+        PanelTransparency = 0,
+        PaneTransparency = 0,
+    },
+    Glass = {
+        Window = Color3.fromRGB(18, 18, 38),
+        Panel = Color3.fromRGB(255, 255, 255),
+        Pane = Color3.fromRGB(28, 24, 52),
+        Header = Color3.fromRGB(22, 18, 46),
+        Active = Color3.fromRGB(175, 140, 255),
+        Border = Color3.fromRGB(255, 255, 255),
+        Text = Color3.fromRGB(245, 245, 255),
+        SubText = Color3.fromRGB(185, 185, 220),
+        Accent = Color3.fromRGB(180, 160, 255),
+        Success = Color3.fromRGB(110, 225, 175),
+        Warning = Color3.fromRGB(255, 190, 120),
+        Error = Color3.fromRGB(245, 100, 135),
+        PanelTransparency = 0.32,
+        PaneTransparency = 0.18,
+    },
+}
+
+local ZNX = {
+    Theme = {},
+    Watch = {},
+    SaveDir = "znx5_cfg",
+    ConfigFile = "theme_config.json",
+    CurrentPreset = "Orion",
+    NotifPos = "BottomRight",
+    Minimized = false,
+    SaveEnabled = true,
+}
+
+for key, value in pairs(Presets.Orion) do
+    ZNX.Theme[key] = value
+end
+
+local function createFolder(path)
+    if isfolder and not isfolder(path) then
+        makefolder(path)
+    end
+end
+
+local function saveConfig()
+    if not writefile or not isfolder then return end
+    createFolder(ZNX.SaveDir)
+    local data = {
+        Theme = ZNX.CurrentPreset,
+        NotifPos = ZNX.NotifPos or "BottomRight",
+        ToggleKey = (ZNX.ToggleKey and ZNX.ToggleKey.Name) or "M",
+    }
+    pcall(function()
+        writefile(ZNX.SaveDir .. "/" .. ZNX.ConfigFile, game:GetService("HttpService"):JSONEncode(data))
+    end)
+end
+
+local function loadConfig()
+    if not readfile or not isfile then return end
+    if not isfolder(ZNX.SaveDir) then return end
+    local path = ZNX.SaveDir .. "/" .. ZNX.ConfigFile
+    if not isfile(path) then return end
+    local ok, data = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(readfile(path))
+    end)
+    if not ok or type(data) ~= "table" then return end
+    if data.Theme and Presets[data.Theme] then
+        ZNX.CurrentPreset = data.Theme
+        for key, value in pairs(Presets[data.Theme]) do
+            ZNX.Theme[key] = value
+        end
+    end
+    ZNX.NotifPos = data.NotifPos or ZNX.NotifPos
+    if data.ToggleKey and Enum.KeyCode[data.ToggleKey] then
+        ZNX.ToggleKey = Enum.KeyCode[data.ToggleKey]
+    end
+end
+
+loadConfig()
+
+local gethui = getgenv().gethui or function() return game.CoreGui end
 local GP = (gethui and gethui()) or game:GetService("CoreGui") or LP:WaitForChild("PlayerGui")
 
--- TWEEN
-local TI = {
-	Snap  = TweenInfo.new(0.04, Enum.EasingStyle.Linear),
-	Fast  = TweenInfo.new(0.12, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-	Mid   = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-	Back  = TweenInfo.new(0.25, Enum.EasingStyle.Back,  Enum.EasingDirection.Out),
-	Slow  = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-}
-local function Tw(o,i,p) if o and o.Parent then TS:Create(o,i,p):Play() end end
+local Root = new("ScreenGui", {
+    Name = "ZNX_ORION",
+    ResetOnSpawn = false,
+    IgnoreGuiInset = true,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    Parent = GP,
+})
 
--- HELPERS
-local function N(cls, props, kids)
-	local o = Instance.new(cls)
-	for k,v in pairs(props or {}) do o[k]=v end
-	for _,c in pairs(kids  or {}) do c.Parent=o end
-	return o
+for _, child in ipairs(GP:GetChildren()) do
+    if child.Name == Root.Name and child ~= Root then
+        child:Destroy()
+    end
 end
-local function Rnd(n,f) if not f or f==0 then return n end; return math.clamp(math.floor(n/f+.5)*f,-1e9,1e9) end
-local function Cl(n,a,b) return math.max(a,math.min(b,n)) end
-local function CPk(c) return{R=math.round(c.R*255),G=math.round(c.G*255),B=math.round(c.B*255)} end
-local function CUp(t) return type(t)=="table" and Color3.fromRGB(Cl(t.R,0,255),Cl(t.G,0,255),Cl(t.B,0,255)) or Color3.fromRGB(200,200,200) end
-local function Snd(id,v) local s=N("Sound",{SoundId=id,Volume=v or .2,Parent=SS}); s:Play(); game.Debris:AddItem(s,4) end
 
--- GUI ROOT
-local Root = N("ScreenGui",{Name="ZNXHUB5",ResetOnSpawn=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,IgnoreGuiInset=true,Parent=GP})
-;(protectgui or (syn and syn.protect_gui) or function()end)(Root)
-for _,g in ipairs(GP:GetChildren()) do if g.Name=="ZNXHUB5" and g~=Root then g:Destroy() end end
-local MGui  = N("ScreenGui",{Name="__ZNX5M",ResetOnSpawn=false,DisplayOrder=5,IgnoreGuiInset=true,Parent=GP})
-local Modal = N("TextButton",{Size=UDim2.new(0,0,0,0),BackgroundTransparency=1,Text="",Modal=true,Parent=MGui,Visible=true,Active=true})
+local function bindProperty(obj, prop, themeKey)
+    table.insert(ZNX.Watch, function()
+        if obj and obj.Parent and ZNX.Theme[themeKey] ~= nil then
+            obj[prop] = ZNX.Theme[themeKey]
+        end
+    end)
+    if ZNX.Theme[themeKey] ~= nil then
+        obj[prop] = ZNX.Theme[themeKey]
+    end
+end
 
--- PALETA ORION (cores minimalistas)
-local DT = {
-	Bg0   = Color3.fromRGB(20, 20, 20),    -- fundo principal
-	Bg1   = Color3.fromRGB(25, 25, 25),    -- sidebar
-	Bg2   = Color3.fromRGB(33, 33, 33),    -- cards
-	Bg3   = Color3.fromRGB(40, 40, 40),    -- hover
-	Bg4   = Color3.fromRGB(45, 45, 45),    -- selecionado
-	BgI   = Color3.fromRGB(28, 28, 28),    -- inputs
-	Line  = Color3.fromRGB(53, 53, 53),    -- bordas
-	A     = Color3.fromRGB(181, 1, 31),    -- accent vermelho
-	ADim  = Color3.fromRGB(139, 0, 23),    -- accent escuro
-	ABr   = Color3.fromRGB(210, 20, 50),   -- accent brilhante
-	ASel  = Color3.fromRGB(118, 0, 20),    -- selecionado
-	A2    = Color3.fromRGB(255, 70, 100),  -- accent secundário
-	A2Dim = Color3.fromRGB(180, 30, 60),
-	Ok    = Color3.fromRGB(80, 200, 80),
-	Err   = Color3.fromRGB(240, 70, 70),
-	Warn  = Color3.fromRGB(255, 180, 50),
-	TxA   = Color3.fromRGB(255, 255, 255), -- texto principal
-	TxB   = Color3.fromRGB(198, 198, 198), -- texto secundário
-	TxC   = Color3.fromRGB(140, 140, 140), -- texto terciário
-	Scr   = Color3.fromRGB(181, 1, 31),    -- scrollbar
-	SW    = 100,
-	TH    = 43,
+local function applyTheme()
+    for _, fn in ipairs(ZNX.Watch) do
+        pcall(fn)
+    end
+end
+
+local function setTheme(name)
+    if Presets[name] then
+        ZNX.CurrentPreset = name
+        for key, value in pairs(Presets[name]) do
+            ZNX.Theme[key] = value
+        end
+        applyTheme()
+        saveConfig()
+        ZNX:Notify("Tema " .. name .. " aplicado.", "success")
+    end
+end
+
+function ZNX:Notify(message, kind)
+    local accent = ZNX.Theme.Active
+    if kind == "success" then accent = ZNX.Theme.Success
+    elseif kind == "warn" then accent = ZNX.Theme.Warning
+    elseif kind == "error" then accent = ZNX.Theme.Error end
+
+    local position = UDim2.new(1, -16, 1, -16)
+    local anchor = Vector2.new(1, 1)
+    if ZNX.NotifPos == "BottomLeft" then
+        position = UDim2.new(0, 16, 1, -16)
+        anchor = Vector2.new(0, 1)
+    elseif ZNX.NotifPos == "TopRight" then
+        position = UDim2.new(1, -16, 0, 16)
+        anchor = Vector2.new(1, 0)
+    elseif ZNX.NotifPos == "TopLeft" then
+        position = UDim2.new(0, 16, 0, 16)
+        anchor = Vector2.new(0, 0)
+    end
+
+    local notif = new("Frame", {
+        Size = UDim2.new(0, 330, 0, 56),
+        Position = position,
+        AnchorPoint = anchor,
+        BackgroundColor3 = ZNX.Theme.Panel,
+        BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
+        BorderSizePixel = 0,
+        ZIndex = 999,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 16)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+        new("Frame", {
+            Position = UDim2.new(0, 0, 0, 0),
+            Size = UDim2.new(0, 6, 1, 0),
+            BackgroundColor3 = accent,
+            BorderSizePixel = 0,
+        }, {new("UICorner", {CornerRadius = UDim.new(0, 4)})}),
+        new("TextLabel", {
+            Position = UDim2.new(0, 14, 0, 12),
+            Size = UDim2.new(1, -28, 1, -24),
+            BackgroundTransparency = 1,
+            Text = message,
+            Font = Enum.Font.GothamMedium,
+            TextSize = 14,
+            TextColor3 = ZNX.Theme.Text,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+        }),
+    })
+    notif.Parent = Root
+    tween(notif, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(1, -16, 1, -16)})
+    task.delay(2.6, function()
+        tween(notif, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1})
+        task.delay(0.22, function() if notif then notif:Destroy() end end)
+    end)
+end
+
+local PacketMonitor = {
+    Active = true,
+    Connection = nil,
+    ByteThreshold = 5 * 1024,
+    Cooldown = 18,
+    LastAlert = 0,
 }
 
-local ZNX = {Flags={},Conns={},Theme={},Watch={},SaveEn=false,SaveDir="znx5_cfg",NPos="BottomRight"}
-for k,v in pairs(DT) do ZNX.Theme[k]=v end
+function PacketMonitor:Summarize(value)
+    if typeof(value) == "string" then
+        return string.format("string(%d)", #value)
+    elseif typeof(value) == "number" then
+        return "number"
+    elseif typeof(value) == "Instance" then
+        return value.ClassName
+    elseif typeof(value) == "table" then
+        return "table"
+    else
+        return typeof(value)
+    end
+end
 
--- CONNECTIONS
-local function Alive() return Root and Root.Parent~=nil end
-local function C(sig,fn) if not Alive() then return end; local c=sig:Connect(fn); table.insert(ZNX.Conns,c); return c end
-task.spawn(function()
-	while Alive() do task.wait(.5) end
-	for _,c in pairs(ZNX.Conns) do pcall(function() c:Disconnect() end) end
-	pcall(function() MGui:Destroy() end)
-	_G.__ZNX5=nil
+function PacketMonitor:Alert(remoteName, total, args)
+    local message = string.format("%s detectado: %.1f KB", remoteName, total / 1024)
+    for i = 1, math.min(3, #args) do
+        message = message .. "\n� " .. self:Summarize(args[i])
+    end
+    if #args > 3 then
+        message = message .. "\n..."
+    end
+    ZNX:Notify(message, "warn")
+end
+
+function PacketMonitor:Start()
+    if self.Connection then return end
+    local success, grabEvents = pcall(function()
+        return ReplicatedStorage:WaitForChild("GrabEvents", 5)
+    end)
+    if not success or not grabEvents then
+        ZNX:Notify("GrabEvents n�o encontrado.", "error")
+        return
+    end
+    local remote = grabEvents:FindFirstChild("ExtendGrabLine")
+    if not remote then
+        ZNX:Notify("ExtendGrabLine n�o encontrado.", "error")
+        return
+    end
+    self.Connection = remote.OnClientEvent:Connect(function(...)
+        if not self.Active then return end
+        local args = {...}
+        local total = 0
+        for _, value in ipairs(args) do
+            if typeof(value) == "string" then
+                total = total + #value
+            elseif typeof(value) == "table" then
+                for _, item in pairs(value) do
+                    if typeof(item) == "string" then
+                        total = total + #item
+                    end
+                end
+            elseif typeof(value) == "Instance" then
+                total = total + 16
+            elseif typeof(value) == "number" then
+                total = total + 8
+            end
+        end
+        if total < self.ByteThreshold then return end
+        if tick() - self.LastAlert < self.Cooldown then return end
+        self.LastAlert = tick()
+        self:Alert(remote.Name, total, args)
+    end)
+    ZNX:Notify("Packet Shield ativado.", "success")
+end
+
+function PacketMonitor:Stop()
+    if self.Connection then
+        self.Connection:Disconnect()
+        self.Connection = nil
+    end
+    self.Active = false
+    ZNX:Notify("Packet Shield desativado.", "warn")
+end
+
+local function makeButton(icon, tooltip)
+    local btn = new("TextButton", {
+        Size = UDim2.new(0, 34, 0, 34),
+        BackgroundColor3 = ZNX.Theme.Panel,
+        BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Text = "",
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 18)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+        new("ImageLabel", {
+            Size = UDim2.new(0, 18, 0, 18),
+            Position = UDim2.new(0.5, -9, 0.5, -9),
+            BackgroundTransparency = 1,
+            Image = icon,
+            ImageColor3 = ZNX.Theme.SubText,
+        }),
+    })
+    bindProperty(btn, "BackgroundColor3", "Panel")
+    bindProperty(btn, "BackgroundTransparency", "PanelTransparency")
+    bindProperty(btn:FindFirstChildOfClass("ImageLabel"), "ImageColor3", "SubText")
+    return btn
+end
+
+local Window = new("Frame", {
+    Name = "ZNXWindow",
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(0.5, 0, 0.5, 0),
+    Size = UDim2.new(0, 900, 0, 540),
+    BackgroundColor3 = ZNX.Theme.Window,
+    BorderSizePixel = 0,
+    ClipsDescendants = true,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(0, 26)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+})
+Window.Parent = Root
+
+bindProperty(Window, "BackgroundColor3", "Window")
+
+local LeftPanel = new("Frame", {
+    Name = "LeftPanel",
+    Position = UDim2.new(0, 18, 0, 18),
+    Size = UDim2.new(0, 228, 1, -36),
+    BackgroundColor3 = ZNX.Theme.Panel,
+    BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
+    BorderSizePixel = 0,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(0, 22)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+})
+LeftPanel.Parent = Window
+bindProperty(LeftPanel, "BackgroundColor3", "Panel")
+bindProperty(LeftPanel, "BackgroundTransparency", "PanelTransparency")
+
+local TitleArea = new("Frame", {
+    Name = "TitleArea",
+    Size = UDim2.new(1, 0, 0, 76),
+    BackgroundTransparency = 1,
+}, {
+    new("TextLabel", {
+        Name = "Logo",
+        Position = UDim2.new(0, 18, 0, 18),
+        Size = UDim2.new(1, -36, 0, 26),
+        BackgroundTransparency = 1,
+        Text = "FMG Hub",
+        Font = Enum.Font.GothamBlack,
+        TextSize = 20,
+        TextColor3 = ZNX.Theme.Text,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }),
+})
+TitleArea.Parent = LeftPanel
+bindProperty(TitleArea.Logo, "TextColor3", "Text")
+
+local SearchBox = new("TextBox", {
+    Name = "SearchBox",
+    Position = UDim2.new(0, 18, 0, 106),
+    Size = UDim2.new(1, -36, 0, 38),
+    BackgroundColor3 = ZNX.Theme.Pane,
+    BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
+    BorderSizePixel = 0,
+    Text = "",
+    PlaceholderText = "Search",
+    PlaceholderColor3 = ZNX.Theme.SubText,
+    TextColor3 = ZNX.Theme.Text,
+    Font = Enum.Font.GothamMedium,
+    TextSize = 14,
+    ClearTextOnFocus = false,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(0, 18)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+})
+SearchBox.Parent = LeftPanel
+bindProperty(SearchBox, "BackgroundColor3", "Pane")
+bindProperty(SearchBox, "BackgroundTransparency", "PaneTransparency")
+bindProperty(SearchBox, "TextColor3", "Text")
+bindProperty(SearchBox, "PlaceholderColor3", "SubText")
+
+local TabScroll = new("ScrollingFrame", {
+    Name = "TabScroll",
+    Position = UDim2.new(0, 0, 0, 160),
+    Size = UDim2.new(1, 0, 1, -220),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 6,
+    ScrollBarImageColor3 = ZNX.Theme.Active,
+}, {
+    new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)}),
+    new("UIPadding", {PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12)}),
+})
+TabScroll.Parent = LeftPanel
+bindProperty(TabScroll, "ScrollBarImageColor3", "Active")
+
+local BottomCard = new("Frame", {
+    Name = "BottomCard",
+    Position = UDim2.new(0, 18, 1, -84),
+    Size = UDim2.new(1, -36, 0, 66),
+    BackgroundColor3 = ZNX.Theme.Pane,
+    BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
+    BorderSizePixel = 0,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(0, 18)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+})
+BottomCard.Parent = LeftPanel
+bindProperty(BottomCard, "BackgroundColor3", "Pane")
+bindProperty(BottomCard, "BackgroundTransparency", "PaneTransparency")
+
+new("ImageLabel", {
+    Parent = BottomCard,
+    Position = UDim2.new(0, 10, 0.5, -20),
+    Size = UDim2.new(0, 40, 0, 40),
+    BackgroundTransparency = 1,
+    Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LP.UserId .. "&width=420&height=420&format=png",
+    ScaleType = Enum.ScaleType.Fit,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(1, 0)}),
+    new("UIStroke", {Color = ZNX.Theme.Active, Thickness = 2, Transparency = 0.8}),
+})
+
+new("TextLabel", {
+    Parent = BottomCard,
+    Position = UDim2.new(0, 62, 0, 14),
+    Size = UDim2.new(1, -74, 0, 18),
+    BackgroundTransparency = 1,
+    Text = LP.DisplayName,
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+    TextColor3 = ZNX.Theme.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+
+new("TextLabel", {
+    Parent = BottomCard,
+    Position = UDim2.new(0, 62, 0, 34),
+    Size = UDim2.new(1, -74, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "@" .. LP.Name,
+    Font = Enum.Font.Gotham,
+    TextSize = 12,
+    TextColor3 = ZNX.Theme.SubText,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+
+local TopBar = new("Frame", {
+    Name = "TopBar",
+    Position = UDim2.new(0, 264, 0, 18),
+    Size = UDim2.new(1, -282, 0, 66),
+    BackgroundColor3 = ZNX.Theme.Pane,
+    BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
+    BorderSizePixel = 0,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(0, 18)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    new("UIGradient", {Color = ColorSequence.new{ColorSequenceKeypoint.new(0, ZNX.Theme.Pane), ColorSequenceKeypoint.new(1, ZNX.Theme.Panel)}}),
+})
+TopBar.Parent = Window
+bindProperty(TopBar, "BackgroundColor3", "Pane")
+bindProperty(TopBar, "BackgroundTransparency", "PaneTransparency")
+
+local ContentFrame = new("Frame", {
+    Name = "ContentFrame",
+    Position = UDim2.new(0, 264, 0, 88),
+    Size = UDim2.new(1, -282, 1, -106),
+    BackgroundColor3 = ZNX.Theme.Pane,
+    BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
+    BorderSizePixel = 0,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(0, 24)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+})
+ContentFrame.Parent = Window
+bindProperty(ContentFrame, "BackgroundColor3", "Pane")
+bindProperty(ContentFrame, "BackgroundTransparency", "PaneTransparency")
+
+local HeaderBar = new("Frame", {
+    Name = "HeaderBar",
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+}, {
+    new("UIGradient", {Color = ColorSequence.new{ColorSequenceKeypoint.new(0, ZNX.Theme.Pane), ColorSequenceKeypoint.new(1, ZNX.Theme.Panel)}}),
+})
+HeaderBar.Parent = TopBar
+
+local MainTitle = new("TextLabel", {
+    Parent = HeaderBar,
+    Position = UDim2.new(0, 24, 0, 12),
+    Size = UDim2.new(0.6, 0, 0, 28),
+    BackgroundTransparency = 1,
+    Text = "FMG Hub",
+    Font = Enum.Font.GothamBlack,
+    TextSize = 22,
+    TextColor3 = ZNX.Theme.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+
+local InfoText = new("TextLabel", {
+    Parent = HeaderBar,
+    Position = UDim2.new(0, 24, 0, 40),
+    Size = UDim2.new(0.6, 0, 0, 18),
+    BackgroundTransparency = 1,
+    Text = "Orion style refresh",
+    Font = Enum.Font.Gotham,
+    TextSize = 13,
+    TextColor3 = ZNX.Theme.SubText,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+
+local StatusBar = new("Frame", {
+    Parent = HeaderBar,
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -24, 0, 14),
+    Size = UDim2.new(0, 270, 0, 34),
+    BackgroundColor3 = ZNX.Theme.Panel,
+    BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
+    BorderSizePixel = 0,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(0, 16)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+})
+
+local StatusLabel = new("TextLabel", {
+    Parent = StatusBar,
+    Size = UDim2.new(1, -24, 1, 0),
+    Position = UDim2.new(0, 18, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "-- fps  |  --ms  |  --:--",
+    Font = Enum.Font.GothamMedium,
+    TextSize = 13,
+    TextColor3 = ZNX.Theme.SubText,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+
+local ShieldLabel = new("TextLabel", {
+    Parent = StatusBar,
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -18, 0, 0),
+    Size = UDim2.new(0.5, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "Packet Shield: ATIVO",
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    TextColor3 = ZNX.Theme.Success,
+    TextXAlignment = Enum.TextXAlignment.Right,
+})
+
+bindProperty(MainTitle, "TextColor3", "Text")
+bindProperty(InfoText, "TextColor3", "SubText")
+bindProperty(StatusLabel, "TextColor3", "SubText")
+bindProperty(ShieldLabel, "TextColor3", "Success")
+bindProperty(StatusBar, "BackgroundColor3", "Panel")
+bindProperty(StatusBar, "BackgroundTransparency", "PanelTransparency")
+
+local PageContainer = new("Frame", {
+    Parent = ContentFrame,
+    Position = UDim2.new(0, 0, 0, 76),
+    Size = UDim2.new(1, 0, 1, -76),
+    BackgroundTransparency = 1,
+})
+
+local pageList = {}
+local activePage = nil
+
+local function createPage(name)
+    local page = new("Frame", {
+        Name = name .. "Page",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Visible = false,
+    }, {
+        new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 16)}),
+        new("UIPadding", {PaddingLeft = UDim.new(0, 24), PaddingRight = UDim.new(0, 24), PaddingTop = UDim.new(0, 18), PaddingBottom = UDim.new(0, 18)}),
+    })
+    page.Parent = PageContainer
+    return page
+end
+
+local function createNavEntry(text)
+    local entry = new("TextButton", {
+        Size = UDim2.new(1, 0, 0, 48),
+        BackgroundColor3 = ZNX.Theme.Pane,
+        BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
+        BorderSizePixel = 0,
+        Text = text,
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 14,
+        TextColor3 = ZNX.Theme.Text,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        AutoButtonColor = false,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 18)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    })
+    entry.Parent = TabScroll
+    bindProperty(entry, "BackgroundColor3", "Pane")
+    bindProperty(entry, "BackgroundTransparency", "PaneTransparency")
+    bindProperty(entry:FindFirstChildOfClass("TextLabel") or entry, "TextColor3", "Text")
+    return entry
+end
+
+local function createCard(title, subtitle)
+    local card = new("Frame", {
+        Size = UDim2.new(1, 0, 0, 90),
+        BackgroundColor3 = ZNX.Theme.Panel,
+        BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
+        BorderSizePixel = 0,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 20)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    })
+    local titleLabel = new("TextLabel", {
+        Parent = card,
+        Position = UDim2.new(0, 20, 0, 18),
+        Size = UDim2.new(1, -40, 0, 24),
+        BackgroundTransparency = 1,
+        Text = title,
+        Font = Enum.Font.GothamBold,
+        TextSize = 15,
+        TextColor3 = ZNX.Theme.Text,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    })
+    local descLabel = new("TextLabel", {
+        Parent = card,
+        Position = UDim2.new(0, 20, 0, 44),
+        Size = UDim2.new(1, -40, 0, 34),
+        BackgroundTransparency = 1,
+        Text = subtitle,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 13,
+        TextColor3 = ZNX.Theme.SubText,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextWrapped = true,
+    })
+    bindProperty(card, "BackgroundColor3", "Panel")
+    bindProperty(card, "BackgroundTransparency", "PanelTransparency")
+    bindProperty(titleLabel, "TextColor3", "Text")
+    bindProperty(descLabel, "TextColor3", "SubText")
+    return card
+end
+
+local playerState = {
+    Speed = 16,
+    JumpPower = 50,
+    AutoSpeed = false,
+    AutoJump = false,
+}
+
+local function applyPlayerState()
+    local char = LP.Character or LP.CharacterAdded:Wait()
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = playerState.Speed
+        humanoid.JumpPower = playerState.JumpPower
+    end
+end
+
+LP.CharacterAdded:Connect(function()
+    task.wait(0.1)
+    if playerState.AutoSpeed or playerState.AutoJump then
+        applyPlayerState()
+    end
 end)
 
--- THEME ENGINE
-local function ApplyTheme() for _,fn in pairs(ZNX.Watch) do pcall(fn) end end
-function ZNX:SetColor(k,col) if ZNX.Theme[k]~=nil then ZNX.Theme[k]=col; ApplyTheme() end end
-local function B(obj,prop,key)
-	table.insert(ZNX.Watch,function() if obj and obj.Parent and ZNX.Theme[key]~=nil then obj[prop]=ZNX.Theme[key] end end)
-	if ZNX.Theme[key]~=nil then obj[prop]=ZNX.Theme[key] end
+local function createStyledButton(props, children)
+    local btn = new("TextButton", props, children)
+    bindProperty(btn, "BackgroundColor3", "Pane")
+    bindProperty(btn, "BackgroundTransparency", "PaneTransparency")
+    bindProperty(btn, "TextColor3", "Text")
+    return btn
 end
 
--- DRAG
-local function MkDrag(handle,target)
-	pcall(function()
-		local drag,ds,sp=false
-		C(handle.InputBegan,function(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-				drag=true; ds=i.Position; sp=target.Position
-				i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then drag=false end end)
-			end
-		end)
-		C(UIS.InputChanged,function(i)
-			if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-				local d=i.Position-ds
-				target.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y)
-			end
-		end)
-	end)
+local function createOptionCard(parent, title, subtitle)
+    local frame = new("Frame", {
+        Parent = parent,
+        Size = UDim2.new(1, 0, 0, 98),
+        BackgroundColor3 = ZNX.Theme.Panel,
+        BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
+        BorderSizePixel = 0,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 20)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    })
+    local titleLabel = new("TextLabel", {
+        Parent = frame,
+        Position = UDim2.new(0, 20, 0, 16),
+        Size = UDim2.new(1, -40, 0, 24),
+        BackgroundTransparency = 1,
+        Text = title,
+        Font = Enum.Font.GothamBold,
+        TextSize = 15,
+        TextColor3 = ZNX.Theme.Text,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    })
+    local descLabel = new("TextLabel", {
+        Parent = frame,
+        Position = UDim2.new(0, 20, 0, 42),
+        Size = UDim2.new(1, -40, 0, 44),
+        BackgroundTransparency = 1,
+        Text = subtitle,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 13,
+        TextColor3 = ZNX.Theme.SubText,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextWrapped = true,
+    })
+    bindProperty(frame, "BackgroundColor3", "Panel")
+    bindProperty(frame, "BackgroundTransparency", "PanelTransparency")
+    bindProperty(titleLabel, "TextColor3", "Text")
+    bindProperty(descLabel, "TextColor3", "SubText")
+    return frame
 end
 
--- SAVE/LOAD
-local sDb,sPend=0,false
-local function SaveCfg(name)
-	if not ZNX.SaveEn or not writefile then return end
-	local now=tick(); if now-sDb<1.5 then if not sPend then sPend=true; task.delay(1.5,function() sPend=false; SaveCfg(name) end) end; return end
-	sDb=now
-	task.spawn(function()
-		if not isfolder then return end
-		if not isfolder(ZNX.SaveDir) then makefolder(ZNX.SaveDir) end
-		local d={Flags={},Theme={},NPos=ZNX.NPos}
-		for k,f in pairs(ZNX.Flags) do 
-			if f.Save and f.Type ~= "PlayersDropdown" then 
-				d.Flags[k]=f.Type=="Colorpicker" and{Type="CP",Value=CPk(f.Value)} or{Type=f.Type,Value=f.Value} 
-			end 
-		end
-		for k,v in pairs(ZNX.Theme) do if typeof(v)=="Color3" then d.Theme[k]=CPk(v) end end
-		pcall(writefile,ZNX.SaveDir.."/"..name..".json",HTTP:JSONEncode(d))
-	end)
-end
-local function LoadCfg(name)
-	if not readfile or not isfile then return end
-	local p=ZNX.SaveDir.."/"..name..".json"; if not isfile(p) then return end
-	local ok,d=pcall(function() return HTTP:JSONDecode(readfile(p)) end); if not ok then return end
-	if d.NPos then ZNX.NPos=d.NPos end
-	if d.Theme then for k,v in pairs(d.Theme) do if ZNX.Theme[k]~=nil then ZNX.Theme[k]=CUp(v) end end; ApplyTheme() end
-	task.defer(function()
-		for k,fd in pairs(d.Flags or {}) do if ZNX.Flags[k] and ZNX.Flags[k].Type ~= "PlayersDropdown" then task.spawn(function()
-			if fd.Type=="CP" then ZNX.Flags[k]:Set(CUp(fd.Value)) elseif fd.Value~=nil then ZNX.Flags[k]:Set(fd.Value) end
-		end) end end
-	end)
-end
-
--- NOTIFICAÇÕES ESTILO ORION
-local _NH = nil
-local function BuildNH()
-	if _NH then _NH:Destroy() end
-	local pos=ZNX.NPos
-	local isR=pos=="TopRight"   or pos=="BottomRight"
-	local isB=pos=="BottomLeft" or pos=="BottomRight"
-	local P,W=12,300
-	local px=isR and UDim2.new(1,-(W+P),isB and 1 or 0,isB and -P or P) or UDim2.new(0,P,isB and 1 or 0,isB and -P or P)
-	_NH=N("Frame",{Parent=Root,Size=UDim2.new(0,W,1,-(P*2)),Position=px,AnchorPoint=Vector2.new(0,isB and 1 or 0),BackgroundTransparency=1},{
-		N("UIListLayout",{SortOrder=Enum.SortOrder.LayoutOrder,
-			VerticalAlignment=isB and Enum.VerticalAlignment.Bottom or Enum.VerticalAlignment.Top,
-			HorizontalAlignment=Enum.HorizontalAlignment.Center,Padding=UDim.new(0,6)}),
-	})
-	return _NH
-end
-BuildNH()
-function ZNX:SetNotifyPosition(pos) ZNX.NPos=pos; BuildNH() end
-
-function ZNX:Notify(cfg)
-	cfg=cfg or{}
-	cfg.Title    = cfg.Title    or "Aviso"
-	cfg.Message  = cfg.Message  or ""
-	cfg.Duration = cfg.Duration or 5
-	cfg.Type     = cfg.Type     or "info"
-	cfg.Aura     = cfg.Aura     or false
-
-	local accent
-	if     cfg.Type=="ok"   or cfg.Type=="success" then accent=Color3.fromRGB(80,200,80)
-	elseif cfg.Type=="err"  or cfg.Type=="danger"  then accent=Color3.fromRGB(240,70,70)
-	elseif cfg.Type=="warn"                         then accent=Color3.fromRGB(255,180,50)
-	else                                                 accent=Color3.fromRGB(181,1,31) end
-
-	Snd("rbxassetid://6698737249",.18)
-	task.spawn(function()
-		local NH=_NH or BuildNH()
-		local isR=ZNX.NPos=="TopRight" or ZNX.NPos=="BottomRight"
-		local offX=isR and UDim2.new(1,12,0,0) or UDim2.new(-1,-12,0,0)
-
-		local wrap=N("Frame",{Parent=NH,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true})
-		local card=N("Frame",{Parent=wrap,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,
-			BackgroundColor3=Color3.fromRGB(25,25,25),BorderSizePixel=0,Position=offX},{
-			N("UICorner",{CornerRadius=UDim.new(0,3)}),
-			N("UIStroke",{Color=accent,Thickness=2}),
-		})
-
-		N("Frame",{Parent=card,Size=UDim2.new(0,4,1,0),Position=UDim2.new(0,0,0,0),BackgroundColor3=accent,BorderSizePixel=0})
-		
-		local inner=N("Frame",{Parent=card,Position=UDim2.new(0,12,0,0),Size=UDim2.new(1,-12,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1})
-		N("UIPadding",{Parent=inner,PaddingTop=UDim.new(0,10),PaddingBottom=UDim.new(0,10)})
-		N("UIListLayout",{Parent=inner,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,4)})
-		
-		local titleLbl=N("TextLabel",{Parent=inner,Size=UDim2.new(1,0,0,16),BackgroundTransparency=1,
-			Text=cfg.Title,Font=Enum.Font.GothamSemibold,TextSize=13,
-			TextColor3=Color3.fromRGB(255,255,255),TextXAlignment=Enum.TextXAlignment.Left})
-		
-		if cfg.Message~="" then
-			N("TextLabel",{Parent=inner,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,
-				Text=cfg.Message,Font=Enum.Font.Gotham,TextSize=11,
-				TextColor3=Color3.fromRGB(198,198,198),TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true})
-		end
-		
-		Tw(card,TweenInfo.new(.2,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{Position=UDim2.new(0,0,0,0)})
-		task.wait(cfg.Duration-.3)
-		Tw(card,TI.Mid,{BackgroundTransparency=1})
-		task.wait(.15)
-		Tw(card,TweenInfo.new(.15,Enum.EasingStyle.Quint,Enum.EasingDirection.In),{Position=offX})
-		task.wait(.2); wrap:Destroy()
-	end)
+local function createToggleOption(parent, title, subtitle, initial, callback)
+    local frame = createOptionCard(parent, title, subtitle)
+    frame.Size = UDim2.new(1, 0, 0, 108)
+    local state = initial
+    local toggle = new("TextButton", {
+        Parent = frame,
+        Position = UDim2.new(1, -110, 0, 34),
+        Size = UDim2.new(0, 98, 0, 36),
+        Text = state and "ON" or "OFF",
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        AutoButtonColor = false,
+        BorderSizePixel = 0,
+        BackgroundColor3 = ZNX.Theme.Panel,
+        BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 14)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    })
+    local function refresh(value)
+        state = value
+        toggle.Text = state and "ON" or "OFF"
+        toggle.BackgroundColor3 = state and ZNX.Theme.Active or ZNX.Theme.Panel
+        callback(value)
+    end
+    toggle.MouseButton1Click:Connect(function()
+        refresh(not state)
+    end)
+    bindProperty(toggle, "TextColor3", "Text")
+    return frame, toggle, refresh
 end
 
--- PACKET DETECTOR (mantido)
-local PacketDetector = {
-	Active = false,
-	Connection = nil,
-	KB_THRESHOLD = 5,
-	BYTE_THRESHOLD = 5 * 1024,
-	COOLDOWN = 30,
-	lastNotify = 0,
-}
-
-function PacketDetector:shortenString(str)
-	if #str <= 100 then return str end
-	return str:sub(1, 100) .. "... (+" .. (#str - 100) .. " chars)"
+local function createNumberOption(parent, title, subtitle, minValue, maxValue, initialValue, step, callback)
+    local frame = createOptionCard(parent, title, subtitle)
+    frame.Size = UDim2.new(1, 0, 0, 120)
+    local current = initialValue
+    local valueLabel = new("TextLabel", {
+        Parent = frame,
+        Position = UDim2.new(0, 20, 0, 52),
+        Size = UDim2.new(0, 0, 0, 24),
+        BackgroundTransparency = 1,
+        Text = tostring(current),
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        TextColor3 = ZNX.Theme.Active,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    })
+    local minus = createStyledButton({
+        Parent = frame,
+        Position = UDim2.new(0, 0, 0, 80),
+        Size = UDim2.new(0, 100, 0, 30),
+        Text = "-",
+        Font = Enum.Font.GothamBold,
+        TextSize = 18,
+        AutoButtonColor = false,
+        BorderSizePixel = 0,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 12)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    })
+    local plus = createStyledButton({
+        Parent = frame,
+        Position = UDim2.new(0, 110, 0, 80),
+        Size = UDim2.new(0, 100, 0, 30),
+        Text = "+",
+        Font = Enum.Font.GothamBold,
+        TextSize = 18,
+        AutoButtonColor = false,
+        BorderSizePixel = 0,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 12)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    })
+    local function updateValue(value)
+        current = clamp(value, minValue, maxValue)
+        valueLabel.Text = tostring(current)
+        callback(current)
+    end
+    minus.MouseButton1Click:Connect(function()
+        updateValue(current - step)
+    end)
+    plus.MouseButton1Click:Connect(function()
+        updateValue(current + step)
+    end)
+    bindProperty(valueLabel, "TextColor3", "Active")
+    return frame, updateValue
 end
 
-function PacketDetector:summarizeTable(tbl, depth)
-	depth = depth or 0
-	if depth > 2 then return "table[...]" end
-	local preview = {}
-	local count = 0
-	for k, v in pairs(tbl) do
-		count += 1
-		if count <= 4 then
-			local key = type(k) == "string" and k or tostring(k)
-			local val = type(v) == "table" and self:summarizeTable(v, depth + 1) or tostring(v)
-			table.insert(preview, key .. "=" .. val)
-		end
-	end
-	if count > 4 then table.insert(preview, "...") end
-	return "{" .. table.concat(preview, ", ") .. "}"
+local function createActionOption(parent, title, subtitle, buttonText, callback)
+    local frame = createOptionCard(parent, title, subtitle)
+    frame.Size = UDim2.new(1, 0, 0, 108)
+    local action = createStyledButton({
+        Parent = frame,
+        Position = UDim2.new(1, -120, 0, 34),
+        Size = UDim2.new(0, 108, 0, 36),
+        Text = buttonText,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        AutoButtonColor = false,
+        BorderSizePixel = 0,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 14)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    })
+    action.MouseButton1Click:Connect(callback)
+    bindProperty(action, "TextColor3", "Text")
+    return frame, action
 end
 
-function PacketDetector:resolveSender(args)
-	for _, v in ipairs(args) do
-		if typeof(v) == "Instance" and v:IsA("Player") then
-			return v
-		end
-		if typeof(v) == "Instance" and v:IsA("Model") then
-			local plr = Players:GetPlayerFromCharacter(v)
-			if plr then return plr end
-		end
-		if typeof(v) == "Instance" and v:IsA("BasePart") then
-			local model = v:FindFirstAncestorOfClass("Model")
-			if model then
-				local plr = Players:GetPlayerFromCharacter(model)
-				if plr then return plr end
-			end
-		end
-	end
-	return LP
+local function setActivePage(name)
+    for pageName, pageData in pairs(pageList) do
+        pageData.Page.Visible = pageName == name
+        pageData.Button.BackgroundColor3 = pageName == name and ZNX.Theme.Active or ZNX.Theme.Pane
+        pageData.Button.BackgroundTransparency = pageName == name and 0 or (ZNX.Theme.PaneTransparency or 0)
+        pageData.Button.TextColor3 = pageName == name and ZNX.Theme.Text or ZNX.Theme.SubText
+    end
+    activePage = name
 end
 
-function PacketDetector:compressArgs(args)
-	local summary = {}
-	local stringSizes = {}
-	
-	for _, v in ipairs(args) do
-		local key
-		if typeof(v) == "string" then
-			key = "📝 " .. self:shortenString(v)
-			stringSizes[key] = (stringSizes[key] or 0) + #v
-		elseif typeof(v) == "Instance" then
-			key = "🔧 " .. v.ClassName .. "(" .. v.Name .. ")"
-		elseif typeof(v) == "table" then
-			key = "📦 " .. self:summarizeTable(v)
-		elseif typeof(v) == "number" then
-			key = "🔢 " .. string.format("%.2f", v)
-		else
-			key = "📄 " .. typeof(v) .. ":" .. tostring(v):sub(1, 50)
-		end
-		table.insert(summary, key)
-	end
-	
-	for k, size in pairs(stringSizes) do
-		if size > 500 then
-			table.insert(summary, "⚠️ " .. k .. " (" .. string.format("%.2f", size/1024) .. " KB)")
-		end
-	end
-	
-	return summary
+local function addPage(name)
+    local button = createNavEntry(name)
+    local page = createPage(name)
+    pageList[name] = {Button = button, Page = page}
+    button.MouseButton1Click:Connect(function()
+        setActivePage(name)
+    end)
+    return page
 end
 
-function PacketDetector:showNotification(sender, mbSize, args, remoteName)
-	local summarized = self:compressArgs(args)
-	local msgLines = {
-		"👤 " .. sender.DisplayName .. " (@" .. sender.Name .. ")",
-		"📦 " .. string.format("%.3f MB", mbSize),
-		"🎯 " .. remoteName,
-		"",
-		"📋 ARGUMENTOS:",
-	}
-	
-	for i, line in ipairs(summarized) do
-		if i <= 5 then
-			table.insert(msgLines, "  " .. line)
-		end
-	end
-	
-	if #summarized > 5 then
-		table.insert(msgLines, "  ... (+" .. (#summarized - 5) .. " mais)")
-	end
-	
-	ZNX:Notify({
-		Title = "🚨 SUSPECT PACKET DETECTED",
-		Message = table.concat(msgLines, "\n"),
-		Duration = 8,
-		Type = "danger",
-		Aura = true,
-	})
-	
-	if mbSize > 1 then
-		task.spawn(function()
-			local screenFlash = N("Frame", {Parent=Root, Size=UDim2.new(1,0,1,0), BackgroundColor3=Color3.fromRGB(240,70,70), BackgroundTransparency=0.7, BorderSizePixel=0})
-			Tw(screenFlash, TweenInfo.new(0.2), {BackgroundTransparency=1})
-			task.wait(0.2)
-			screenFlash:Destroy()
-		end)
-	end
+local bindingKey = false
+ZNX.ToggleKey = Enum.KeyCode.M
+
+local dashboardPage = addPage("Dashboard")
+createActionOption(dashboardPage, "Abrir configurações", "Navegue rapidamente para a aba de temas e notificações.", "Abrir", function()
+    setActivePage("Settings")
+end)
+createActionOption(dashboardPage, "Recarregar interface", "Reaplica o tema atual e reinicializa a aparência.", "Recarregar", function()
+    applyTheme()
+    ZNX:Notify("Interface recarregada.", "success")
+end)
+createActionOption(dashboardPage, "Abrir Player", "Vá direto para os controles de movimento.", "Abrir", function()
+    setActivePage("Player")
+end)
+
+local playerPage = addPage("Player")
+createNumberOption(playerPage, "WalkSpeed", "Controle a velocidade do personagem.", 16, 120, playerState.Speed, 4, function(value)
+    playerState.Speed = value
+    if playerState.AutoSpeed then
+        applyPlayerState()
+    else
+        applyPlayerState()
+    end
+end)
+createNumberOption(playerPage, "JumpPower", "Ajuste o salto para escapar com mais força.", 50, 220, playerState.JumpPower, 5, function(value)
+    playerState.JumpPower = value
+    if playerState.AutoJump then
+        applyPlayerState()
+    else
+        applyPlayerState()
+    end
+end)
+createToggleOption(playerPage, "Auto Apply", "Mantém as configurações ativas ao nascer.", true, function(value)
+    playerState.AutoSpeed = value
+    playerState.AutoJump = value
+    if value then
+        applyPlayerState()
+    end
+end)
+
+local defensePage = addPage("Invulnerability")
+createToggleOption(defensePage, "Packet Shield", "Ativa ou desativa o detector de pacotes de grab.", PacketMonitor.Active, function(value)
+    if value then
+        PacketMonitor:Start()
+    else
+        PacketMonitor:Stop()
+    end
+end)
+createActionOption(defensePage, "Recarregar Shield", "Reativa o monitor de pacotes manualmente.", "Recarregar", function()
+    PacketMonitor:Start()
+end)
+
+local grabPage = addPage("Grab")
+createNumberOption(grabPage, "Threshold", "Sensibilidade do detector de pacotes.", 1024, 30720, PacketMonitor.ByteThreshold, 512, function(value)
+    PacketMonitor.ByteThreshold = value
+    ZNX:Notify("Threshold ajustado para " .. tostring(value) .. " bytes.", "success")
+end)
+createActionOption(grabPage, "Verificar Grab", "Checa manualmente se o remote está presente.", "Verificar", function()
+    PacketMonitor:Start()
+end)
+
+local bindsPage = addPage("Keybinds")
+local bindFrame, bindButton = createActionOption(bindsPage, "Definir atalho", "Clique para definir a tecla de atalho de exibição.", "Definir", function()
+    bindingKey = true
+    ZNX:Notify("Pressione uma tecla para configurar o atalho.", "warn")
+end)
+local resetBindFrame, resetBindButton = createActionOption(bindsPage, "Resetar atalho", "Volta para a tecla padrão M.", "Resetar", function()
+    ZNX.ToggleKey = Enum.KeyCode.M
+    saveConfig()
+    ZNX:Notify("Atalho resetado para M.", "success")
+end)
+
+local loopsPage = addPage("Loops")
+createToggleOption(loopsPage, "Auto Speed", "Mantém a velocidade aplicada constantemente.", false, function(value)
+    playerState.AutoSpeed = value
+    if value then applyPlayerState() end
+end)
+createToggleOption(loopsPage, "Auto Jump", "Mantém o salto aplicado constantemente.", false, function(value)
+    playerState.AutoJump = value
+    if value then applyPlayerState() end
+end)
+createActionOption(loopsPage, "Aplicar agora", "Force a aplicação imediata das configurações de jogador.", "Aplicar", function()
+    applyPlayerState()
+    ZNX:Notify("Configurações aplicadas ao jogador.", "success")
+end)
+
+local settingsPage = addPage("Settings")
+createThemeButton(settingsPage, "Orion", "Orion")
+createThemeButton(settingsPage, "Glass", "Glass")
+createCard("Notificações", "Escolha a posição onde as mensagens aparecem."):Parent(settingsPage)
+
+setActivePage("Dashboard")
+
+local closeButton = makeButton("rbxassetid://7072725342", "Close")
+closeButton.Parent = HeaderBar
+closeButton.Position = UDim2.new(1, -18, 0, 16)
+closeButton.ZIndex = 10
+closeButton.MouseButton1Click:Connect(function()
+    Root.Enabled = false
+    ZNX:Notify("Menu fechado. Pressione M para abrir.", "warn")
+end)
+
+local minimizeButton = makeButton("rbxassetid://7072719338", "Minimize")
+minimizeButton.Parent = HeaderBar
+minimizeButton.Position = UDim2.new(1, -60, 0, 16)
+minimizeButton.ZIndex = 10
+
+local originalWindow = {Size = Window.Size, Position = Window.Position}
+minimizeButton.MouseButton1Click:Connect(function()
+    ZNX.Minimized = not ZNX.Minimized
+    if ZNX.Minimized then
+        tween(Window, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 320, 0, 116)})
+        tween(Window, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, 0, 0.5, 0)})
+        ContentFrame.Visible = false
+        LeftPanel.Visible = false
+        ZNX:Notify("Janela minimizada. Clique novamente para restaurar.", "warn")
+    else
+        ContentFrame.Visible = true
+        LeftPanel.Visible = true
+        tween(Window, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalWindow.Size})
+        tween(Window, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = originalWindow.Position})
+        ZNX:Notify("Janela restaurada.", "success")
+    end
+end)
+
+local function createThemeButton(parent, label, preset)
+    local btn = new("TextButton", {
+        Parent = parent,
+        Size = UDim2.new(1, 0, 0, 44),
+        BackgroundColor3 = ZNX.Theme.Pane,
+        BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
+        BorderSizePixel = 0,
+        Text = label,
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 14,
+        TextColor3 = ZNX.Theme.Text,
+        AutoButtonColor = false,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 16)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    })
+    btn.MouseButton1Click:Connect(function()
+        setTheme(preset)
+    end)
+    return btn
 end
 
-function PacketDetector:start()
-	if self.Connection then return end
-	
-	local grabEvents = game:GetService("ReplicatedStorage"):FindFirstChild("GrabEvents")
-	if not grabEvents then
-		ZNX:Notify({Title="⚠️ Detector", Message="Remote 'GrabEvents' não encontrado", Duration=3, Type="warn"})
-		return
-	end
-	
-	local extendGrabLine = grabEvents:FindFirstChild("ExtendGrabLine")
-	if not extendGrabLine then
-		ZNX:Notify({Title="⚠️ Detector", Message="Remote 'ExtendGrabLine' não encontrado", Duration=3, Type="warn"})
-		return
-	end
-	
-	self.Connection = extendGrabLine.OnClientEvent:Connect(function(...)
-		if not self.Active then return end
-		
-		local args = { ... }
-		local totalBytes = 0
-		
-		for _, v in ipairs(args) do
-			if typeof(v) == "string" then
-				totalBytes += #v
-			elseif typeof(v) == "table" then
-				totalBytes += #HTTP:JSONEncode(v)
-			end
-		end
-		
-		if totalBytes < self.BYTE_THRESHOLD then return end
-		if tick() - self.lastNotify < self.COOLDOWN then return end
-		
-		self.lastNotify = tick()
-		local sender = self:resolveSender(args)
-		local mbSize = totalBytes / (1024 * 1024)
-		
-		self:showNotification(sender, mbSize, args, extendGrabLine.Name)
-	end)
-	
-	self.Active = true
-	ZNX:Notify({Title="🔍 Packet Detector", Message="Ativo - Monitorando pacotes suspeitos", Duration=3, Type="ok"})
+local themeSection = new("Frame", {
+    Parent = settingsPage,
+    Size = UDim2.new(1, 0, 0, 160),
+    BackgroundTransparency = 1,
+}, {
+    new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)}),
+})
+createThemeButton(themeSection, "Orion", "Orion")
+createThemeButton(themeSection, "Glass", "Glass")
+
+local function createNotifyButton(parent, label, value)
+    local btn = new("TextButton", {
+        Parent = parent,
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = ZNX.Theme.Pane,
+        BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
+        BorderSizePixel = 0,
+        Text = label,
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 13,
+        TextColor3 = ZNX.Theme.Text,
+        AutoButtonColor = false,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 14)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    })
+    btn.MouseButton1Click:Connect(function()
+        ZNX.NotifPos = value
+        saveConfig()
+        ZNX:Notify("Posição de notificação salva: " .. label, "success")
+    end)
+    return btn
 end
 
-function PacketDetector:stop()
-	if self.Connection then
-		self.Connection:Disconnect()
-		self.Connection = nil
-	end
-	self.Active = false
-	ZNX:Notify({Title="🔍 Packet Detector", Message="Desativado", Duration=2, Type="info"})
+local notifSection = new("Frame", {
+    Parent = settingsPage,
+    Size = UDim2.new(1, 0, 0, 192),
+    BackgroundTransparency = 1,
+}, {
+    new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)}),
+    new("UIPadding", {PaddingLeft = UDim.new(0, 0), PaddingRight = UDim.new(0, 0), PaddingTop = UDim.new(0, 0), PaddingBottom = UDim.new(0, 0)}),
+})
+new("TextLabel", {
+    Parent = notifSection,
+    Size = UDim2.new(1, 0, 0, 18),
+    BackgroundTransparency = 1,
+    Text = "Posição de notificação",
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+    TextColor3 = ZNX.Theme.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+createNotifyButton(notifSection, "BottomRight", "BottomRight")
+createNotifyButton(notifSection, "BottomLeft", "BottomLeft")
+createNotifyButton(notifSection, "TopRight", "TopRight")
+createNotifyButton(notifSection, "TopLeft", "TopLeft")
+
+local function updateTime()
+    local time = os.date("*t")
+    StatusLabel.Text = string.format("%02d:%02d  �  %s", time.hour, time.min, ZNX.CurrentPreset)
 end
 
--- SHARED BUILDERS (estilo Orion - reto, minimalista)
-local function MkScroll(parent)
-	local sf=N("ScrollingFrame",{Parent=parent,BackgroundTransparency=1,BorderSizePixel=0,
-		ScrollBarThickness=4,ScrollBarImageColor3=ZNX.Theme.Scr,CanvasSize=UDim2.new(0,0,0,0),
-		ScrollingDirection=Enum.ScrollingDirection.Y,ElasticBehavior=Enum.ElasticBehavior.Never})
-	B(sf,"ScrollBarImageColor3","Scr"); return sf
-end
+RS.RenderStepped:Connect(function(dt)
+    local fps = math.floor(1 / math.max(dt, 1 / 120))
+    local ping = 0
+    pcall(function()
+        ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+    end)
+    updateTime()
+    ShieldLabel.Text = "Packet Shield: ATIVO"
+end)
 
-local function MkCard(par,h)
-	local f=N("Frame",{Parent=par,BackgroundColor3=ZNX.Theme.Bg2,BorderSizePixel=0,Size=UDim2.new(1,0,0,h or 42)},{N("UICorner",{CornerRadius=UDim.new(0,3)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1})})
-	B(f,"BackgroundColor3","Bg2")
-	return f
-end
+local dragInfo = {active = false, start = Vector2.new(), origin = Vector2.new()}
+Window.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragInfo.active = true
+        dragInfo.start = input.Position
+        dragInfo.origin = Vector2.new(Window.Position.X.Offset, Window.Position.Y.Offset)
+    end
+end)
+Window.InputChanged:Connect(function(input)
+    if dragInfo.active and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragInfo.start
+        Window.Position = UDim2.new(0, dragInfo.origin.X + delta.X, 0, dragInfo.origin.Y + delta.Y)
+    end
+end)
+Window.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragInfo.active = false
+    end
+end)
 
-local function MkDrop(par,lbl)
-	local outer=N("Frame",{Parent=par,Size=UDim2.new(1,0,0,42),BackgroundColor3=ZNX.Theme.Bg2,BorderSizePixel=0,ClipsDescendants=true},{N("UICorner",{CornerRadius=UDim.new(0,3)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1})})
-	B(outer,"BackgroundColor3","Bg2")
-	local hdr=N("Frame",{Parent=outer,Size=UDim2.new(1,0,0,42),BackgroundTransparency=1})
-	local nl=N("TextLabel",{Parent=hdr,Position=UDim2.new(0,12,0,0),Size=UDim2.new(1,-100,1,0),
-		BackgroundTransparency=1,Text=lbl,Font=Enum.Font.GothamSemibold,TextSize=14,
-		TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Left}); B(nl,"TextColor3","TxA")
-	local selL=N("TextLabel",{Parent=hdr,Position=UDim2.new(1,-92,0,0),Size=UDim2.new(0,82,1,0),
-		BackgroundTransparency=1,Text="",Font=Enum.Font.Gotham,TextSize=12,
-		TextColor3=ZNX.Theme.TxB,TextXAlignment=Enum.TextXAlignment.Right,TextTruncate=Enum.TextTruncate.AtEnd}); B(selL,"TextColor3","TxB")
-	local arr=N("ImageLabel",{Parent=hdr,Position=UDim2.new(1,-24,0.5,-8),Size=UDim2.new(0,16,0,16),
-		BackgroundTransparency=1,Image="rbxassetid://5165666242",ImageColor3=ZNX.Theme.TxC})
-	local sep=N("Frame",{Parent=outer,Position=UDim2.new(0,0,0,42),Size=UDim2.new(1,0,0,1),BackgroundColor3=ZNX.Theme.Line,BorderSizePixel=0,Visible=false})
-	local sc=MkScroll(outer); sc.Position=UDim2.new(0,0,0,43); sc.Size=UDim2.new(1,0,1,-43)
-	local ol=N("UIListLayout",{Parent=sc,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,1)})
-	N("UIPadding",{Parent=sc,PaddingLeft=UDim.new(0,5),PaddingRight=UDim.new(0,5),PaddingTop=UDim.new(0,5),PaddingBottom=UDim.new(0,5)})
-	C(ol:GetPropertyChangedSignal("AbsoluteContentSize"),function() sc.CanvasSize=UDim2.new(0,0,0,ol.AbsoluteContentSize.Y+8) end)
-	local hb=N("TextButton",{Parent=hdr,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",AutoButtonColor=false})
-	return outer,selL,arr,sep,sc,ol,hb
-end
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if bindingKey and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown then
+        bindingKey = false
+        ZNX.ToggleKey = input.KeyCode
+        saveConfig()
+        ZNX:Notify("Atalho configurado para " .. tostring(input.KeyCode.Name) .. ".", "success")
+        return
+    end
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == ZNX.ToggleKey then
+        Root.Enabled = not Root.Enabled
+    end
+end)
 
--- MAKE WINDOW (estilo Orion)
-function ZNX:MakeWindow(wCfg)
-	wCfg=wCfg or{}
-	wCfg.Title        = wCfg.Title        or "ZNXHUB"
-	wCfg.ConfigName   = wCfg.ConfigName   or wCfg.Title
-	wCfg.SaveConfig   = wCfg.SaveConfig   ~=false
-	wCfg.IntroEnabled = wCfg.IntroEnabled ~=false
-	wCfg.IntroText    = wCfg.IntroText    or wCfg.Title
-	wCfg.ToggleKey    = wCfg.ToggleKey    or "M"
-	wCfg.BgImage      = wCfg.BgImage      or ""
-	wCfg.BgImageAlpha = wCfg.BgImageAlpha or 0.82
-	wCfg.Icon         = wCfg.Icon         or ""
-	wCfg.CloseCallback= wCfg.CloseCallback or function()end
-	wCfg.Size         = wCfg.Size         or Vector2.new(528,310)
-	if wCfg.BackgroundImage and wCfg.BackgroundImage~="" then wCfg.BgImage=wCfg.BackgroundImage end
-	ZNX.SaveEn=wCfg.SaveConfig
+applyTheme()
+PacketMonitor:Start()
+ZNX:Notify("Interface Orion carregada.", "success")
 
-	local T=ZNX.Theme
-	local Hidden,Minimized,ActiveTab=false,false,nil
-	local AllTabs={}; local AllElems={}; local firstTab=true
-	local SW,TH=T.SW,T.TH
-
-	local Win=N("Frame",{Parent=Root,
-		Size=UDim2.new(0,wCfg.Size.X,0,wCfg.Size.Y),
-		Position=UDim2.new(.5,-wCfg.Size.X/2,.5,-wCfg.Size.Y/2),
-		BackgroundColor3=T.Bg0,BorderSizePixel=0,Active=true,ClipsDescendants=true},{
-		N("UICorner",{CornerRadius=UDim.new(0,3)}),
-	})
-	B(Win,"BackgroundColor3","Bg0")
-
-	local BgImg=N("ImageLabel",{Parent=Win,ZIndex=1,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,
-		Image=wCfg.BgImage~="" and "rbxassetid://"..wCfg.BgImage or "",
-		ImageTransparency=wCfg.BgImageAlpha,ScaleType=Enum.ScaleType.Crop})
-	local BgDim=N("Frame",{Parent=Win,ZIndex=1,Size=UDim2.new(1,0,1,0),
-		BackgroundColor3=Color3.fromRGB(0,0,0),
-		BackgroundTransparency=wCfg.BgImage~="" and 0.5 or 1,BorderSizePixel=0})
-
-	-- Sidebar estilo Orion (menor, mais compacta)
-	local Sidebar=N("Frame",{Parent=Win,ZIndex=10,Position=UDim2.new(0,0,0,0),
-		Size=UDim2.new(0,SW,1,0),BackgroundColor3=T.Bg1,BorderSizePixel=0})
-	B(Sidebar,"BackgroundColor3","Bg1")
-	local SideEdge=N("Frame",{Parent=Sidebar,ZIndex=11,Position=UDim2.new(1,-1,0,0),
-		Size=UDim2.new(0,1,1,0),BackgroundColor3=T.ADim,BorderSizePixel=0})
-
-	local SideTop=N("Frame",{Parent=Sidebar,ZIndex=11,Size=UDim2.new(1,0,0,TH),BackgroundTransparency=1})
-	local lx=12
-	if wCfg.Icon~="" then
-		N("ImageLabel",{Parent=SideTop,ZIndex=12,Position=UDim2.new(0,10,0.5,-10),Size=UDim2.new(0,20,0,20),BackgroundTransparency=1,Image=wCfg.Icon})
-		lx=38
-	end
-	local TitleL=N("TextLabel",{Parent=SideTop,ZIndex=12,Position=UDim2.new(0,lx,0,0),Size=UDim2.new(1,-lx-8,1,0),
-		BackgroundTransparency=1,Text=wCfg.Title,Font=Enum.Font.GothamSemibold,TextSize=15,
-		TextColor3=T.TxA,TextXAlignment=Enum.TextXAlignment.Left}); B(TitleL,"TextColor3","TxA")
-	N("Frame",{Parent=Sidebar,ZIndex=11,Position=UDim2.new(0,0,0,TH),Size=UDim2.new(1,0,0,1),BackgroundColor3=T.Line,BorderSizePixel=0})
-
-	local TabSc=MkScroll(Sidebar); TabSc.ZIndex=11
-	TabSc.Position=UDim2.new(0,0,0,TH+8); TabSc.Size=UDim2.new(1,0,1,-(TH+8+70))
-	local TabList=N("UIListLayout",{Parent=TabSc,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,2)})
-	N("UIPadding",{Parent=TabSc,PaddingLeft=UDim.new(0,5),PaddingRight=UDim.new(0,5),PaddingTop=UDim.new(0,5),PaddingBottom=UDim.new(0,5)})
-	C(TabList:GetPropertyChangedSignal("AbsoluteContentSize"),function() TabSc.CanvasSize=UDim2.new(0,0,0,TabList.AbsoluteContentSize.Y+10) end)
-
-	N("Frame",{Parent=Sidebar,ZIndex=11,Position=UDim2.new(0,0,1,-68),Size=UDim2.new(1,0,0,1),BackgroundColor3=T.Line,BorderSizePixel=0})
-	local AvF=N("Frame",{Parent=Sidebar,ZIndex=11,Position=UDim2.new(0,0,1,-68),Size=UDim2.new(1,0,0,68),BackgroundTransparency=1})
-	N("ImageLabel",{Parent=AvF,ZIndex=12,Position=UDim2.new(0,8,0.5,-18),Size=UDim2.new(0,36,0,36),BackgroundTransparency=1,
-		Image="https://www.roblox.com/headshot-thumbnail/image?userId="..LP.UserId.."&width=420&height=420&format=png"},{
-		N("UICorner",{CornerRadius=UDim.new(0,3)}),
-		N("UIStroke",{Color=T.A,Thickness=1.5}),
-	})
-	local AvDN=N("TextLabel",{Parent=AvF,ZIndex=12,Position=UDim2.new(0,52,0,14),Size=UDim2.new(1,-60,0,18),
-		BackgroundTransparency=1,Text=LP.DisplayName,Font=Enum.Font.GothamSemibold,TextSize=12,
-		TextColor3=T.TxA,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd}); B(AvDN,"TextColor3","TxA")
-	N("TextLabel",{Parent=AvF,ZIndex=12,Position=UDim2.new(0,52,0,32),Size=UDim2.new(1,-60,0,14),
-		BackgroundTransparency=1,Text="@"..LP.Name,Font=Enum.Font.Gotham,TextSize=10,
-		TextColor3=T.TxC,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd})
-
-	-- TopBar estilo Orion
-	local TopBar=N("Frame",{Parent=Win,ZIndex=12,
-		Position=UDim2.new(0,SW,0,0),Size=UDim2.new(1,-SW,0,TH),
-		BackgroundColor3=T.Bg1,BorderSizePixel=0})
-	B(TopBar,"BackgroundColor3","Bg1")
-	N("Frame",{Parent=Win,ZIndex=13,Position=UDim2.new(0,SW,0,TH),Size=UDim2.new(1,-SW,0,1),BackgroundColor3=T.Line,BorderSizePixel=0})
-	
-	local AccLine=N("Frame",{Parent=Win,ZIndex=14,Position=UDim2.new(0,SW,0,TH),Size=UDim2.new(1,-SW,0,2),BackgroundColor3=T.A,BorderSizePixel=0})
-	B(AccLine,"BackgroundColor3","A")
-
-	local StL=N("TextLabel",{Parent=TopBar,ZIndex=13,Position=UDim2.new(0,10,0,0),Size=UDim2.new(1,-150,1,0),
-		BackgroundTransparency=1,Text="-- fps  |  --ms",Font=Enum.Font.Gotham,TextSize=11,
-		TextColor3=T.TxC,TextXAlignment=Enum.TextXAlignment.Left}); B(StL,"TextColor3","TxC")
-	local _fps,_fh=60,{}
-	C(RS.RenderStepped,function(dt) table.insert(_fh,1/dt); if #_fh>30 then table.remove(_fh,1) end; local s=0; for _,v in ipairs(_fh) do s=s+v end; _fps=math.floor(s/#_fh) end)
-	task.spawn(function()
-		while Alive() do
-			local ping=0; pcall(function() ping=math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()) end)
-			StL.Text=string.format("%d fps  |  %dms",_fps,ping); task.wait(1)
-		end
-	end)
-
-	local BG=N("Frame",{Parent=TopBar,ZIndex=13,Position=UDim2.new(1,-70,0.5,-12),Size=UDim2.new(0,64,0,24),BackgroundTransparency=1})
-	local function WBtn(ico,x)
-		local b=N("TextButton",{Parent=BG,ZIndex=14,Position=UDim2.new(0,x,0,0),Size=UDim2.new(0,24,0,24),
-			BackgroundColor3=T.Bg2,BorderSizePixel=0,Text="",AutoButtonColor=false},{
-			N("UICorner",{CornerRadius=UDim.new(0,3)}),
-			N("UIStroke",{Color=T.Line,Thickness=1}),
-			N("ImageLabel",{Size=UDim2.new(0,12,0,12),Position=UDim2.new(0.5,-6,0.5,-6),BackgroundTransparency=1,Image=ico,ImageColor3=T.TxB,Name="Ico",ZIndex=15}),
-		})
-		B(b,"BackgroundColor3","Bg2")
-		C(b.MouseEnter,function() Tw(b,TI.Fast,{BackgroundColor3=T.Bg3}); b:FindFirstChild("Ico").ImageColor3=T.TxA end)
-		C(b.MouseLeave,function() Tw(b,TI.Fast,{BackgroundColor3=T.Bg2}); b:FindFirstChild("Ico").ImageColor3=T.TxB end)
-		return b
-	end
-	local MinBtn=WBtn("rbxassetid://5165666242",0)
-	local ClsBtn=WBtn("rbxassetid://4988112250",40)
-	MkDrag(TopBar,Win)
-
-	local ContentY=TH
-	local ContentArea=N("Frame",{Parent=Win,ZIndex=8,
-		Position=UDim2.new(0,SW,0,ContentY),Size=UDim2.new(1,-SW,1,-ContentY),
-		BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true})
-
-	local origSz=Win.Size
-	C(ClsBtn.MouseButton1Up,function()
-		Snd("rbxassetid://6698737249",.3); Win.Visible=false; Hidden=true
-		Modal.Visible=false; Modal.Modal=false; UIS.MouseBehavior=Enum.MouseBehavior.LockCenter; UIS.MouseIconEnabled=false
-		ZNX:Notify({Title="Oculto",Message="Pressione "..wCfg.ToggleKey.." para reabrir",Duration=4}); wCfg.CloseCallback()
-	end)
-	C(MinBtn.MouseButton1Up,function()
-		if Minimized then Minimized=false; MinBtn:FindFirstChild("Ico").Image="rbxassetid://5165666242"; Tw(Win,TI.Back,{Size=origSz}); task.wait(.05); Sidebar.Visible=true; ContentArea.Visible=true; TopBar.Visible=true
-		else origSz=Win.Size; Minimized=true; MinBtn:FindFirstChild("Ico").Image="rbxassetid://5165666242"; Tw(MinBtn:FindFirstChild("Ico"),TI.Fast,{Rotation=180}); Sidebar.Visible=false; ContentArea.Visible=false; TopBar.Visible=false; Tw(Win,TI.Back,{Size=UDim2.new(0,math.max(280,#wCfg.Title*10+100),0,TH)}) end
-	end)
-	C(UIS.InputBegan,function(inp,gp)
-		if gp then return end; if UIS:GetFocusedTextBox() then return end
-		local kn=""; pcall(function() kn=inp.KeyCode.Name end)
-		if kn~=wCfg.ToggleKey then return end
-		if Hidden then Hidden=false; Win.Visible=true; Modal.Visible=true; Modal.Modal=true; UIS.MouseBehavior=Enum.MouseBehavior.Default; UIS.MouseIconEnabled=true
-		else Hidden=true; Win.Visible=false; Modal.Visible=false; Modal.Modal=false; UIS.MouseBehavior=Enum.MouseBehavior.LockCenter; UIS.MouseIconEnabled=false; wCfg.CloseCallback() end
-	end)
-
-	if wCfg.IntroEnabled then
-		Win.Visible=false; Modal.Visible=false; Modal.Modal=false
-		task.spawn(function()
-			local Bg=N("Frame",{Parent=Root,ZIndex=200,Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(20,20,20),BorderSizePixel=0})
-			local Logo=N("TextLabel",{Parent=Bg,ZIndex=202,Position=UDim2.new(.5,0,.5,-20),Size=UDim2.new(0,400,0,40),AnchorPoint=Vector2.new(.5,.5),BackgroundTransparency=1,
-				Text=wCfg.IntroText:upper(),Font=Enum.Font.GothamBlack,TextSize=20,TextColor3=T.TxA,TextXAlignment=Enum.TextXAlignment.Center,TextTransparency=1})
-			local Sub=N("TextLabel",{Parent=Bg,ZIndex=202,Position=UDim2.new(.5,0,.5,20),Size=UDim2.new(0,300,0,18),AnchorPoint=Vector2.new(.5,.5),BackgroundTransparency=1,
-				Text="Obsidian  ·  v5.2",Font=Enum.Font.Gotham,TextSize=11,TextColor3=T.TxC,TextXAlignment=Enum.TextXAlignment.Center,TextTransparency=1})
-			Tw(Logo,TweenInfo.new(.4,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{TextTransparency=0})
-			Tw(Sub,TweenInfo.new(.5,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{TextTransparency=0})
-			task.wait(1.5)
-			Tw(Logo,TweenInfo.new(.25,Enum.EasingStyle.Quad),{TextTransparency=1})
-			Tw(Sub,TweenInfo.new(.25,Enum.EasingStyle.Quad),{TextTransparency=1})
-			Tw(Bg,TweenInfo.new(.3,Enum.EasingStyle.Quad),{BackgroundTransparency=1}); task.wait(.35)
-			Bg:Destroy(); Win.Visible=true; Modal.Visible=true; Modal.Modal=true; UIS.MouseIconEnabled=true
-		end)
-	else Win.Visible=true; Modal.Visible=true; Modal.Modal=true; UIS.MouseIconEnabled=true end
-
-	local TabFn={}
-
-	function TabFn:MakeTab(tCfg)
-		tCfg=tCfg or{}; tCfg.Name=tCfg.Name or "Tab"; tCfg.Icon=tCfg.Icon or ""
-
-		local TBtn=N("TextButton",{Parent=TabSc,ZIndex=12,
-			Size=UDim2.new(1,0,0,32),
-			BackgroundColor3=ZNX.Theme.Bg1,
-			BorderSizePixel=0,Text="",AutoButtonColor=false},{
-			N("UICorner",{CornerRadius=UDim.new(0,3)}),
-		})
-		B(TBtn,"BackgroundColor3","Bg1")
-
-		local tabX=10
-		if tCfg.Icon~="" then
-			N("ImageLabel",{Parent=TBtn,ZIndex=13,Position=UDim2.new(0,8,0.5,-8),Size=UDim2.new(0,16,0,16),BackgroundTransparency=1,Image=tCfg.Icon,ImageColor3=ZNX.Theme.TxC,Name="TIco"})
-			tabX=30
-		end
-		local TLbl=N("TextLabel",{Parent=TBtn,ZIndex=13,Position=UDim2.new(0,tabX,0,0),Size=UDim2.new(1,-tabX-4,1,0),
-			BackgroundTransparency=1,Text=tCfg.Name,Font=Enum.Font.GothamSemibold,TextSize=12,
-			TextColor3=ZNX.Theme.TxB,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd})
-		B(TLbl,"TextColor3","TxB")
-
-		local CS=MkScroll(ContentArea); CS.ZIndex=9
-		CS.Size=UDim2.new(1,0,1,0); CS.Position=UDim2.new(0,0,0,0); CS.Visible=false
-		local CSList=N("UIListLayout",{Parent=CS,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,5)})
-		N("UIPadding",{Parent=CS,PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8),PaddingTop=UDim.new(0,8),PaddingBottom=UDim.new(0,8)})
-		C(CSList:GetPropertyChangedSignal("AbsoluteContentSize"),function() CS.CanvasSize=UDim2.new(0,0,0,CSList.AbsoluteContentSize.Y+15) end)
-
-		AllTabs[tCfg.Name]={Btn=TBtn,Content=CS}
-
-		local function Activate()
-			for _,td in pairs(AllTabs) do
-				td.Btn.BackgroundColor3=ZNX.Theme.Bg1
-				local ic=td.Btn:FindFirstChild("TIco"); if ic then ic.ImageColor3=ZNX.Theme.TxC end
-				local lb=td.Btn:FindFirstChildOfClass("TextLabel"); if lb then lb.TextColor3=ZNX.Theme.TxB end
-				td.Content.Visible=false
-			end
-			TBtn.BackgroundColor3=ZNX.Theme.ADim
-			local ic=TBtn:FindFirstChild("TIco"); if ic then ic.ImageColor3=ZNX.Theme.TxA end
-			TLbl.TextColor3=ZNX.Theme.TxA
-			CS.Visible=true
-			ActiveTab=tCfg.Name
-		end
-		C(TBtn.MouseButton1Up,Activate)
-		C(TBtn.MouseEnter,function() if ActiveTab~=tCfg.Name then TBtn.BackgroundColor3=ZNX.Theme.Bg2 end end)
-		C(TBtn.MouseLeave,function() if ActiveTab~=tCfg.Name then TBtn.BackgroundColor3=ZNX.Theme.Bg1 end end)
-		if firstTab then firstTab=false; Activate() end
-
-		local function BuildElem(par,secName)
-			local E={}; secName=secName or ""
-			local function reg(f,lbl) table.insert(AllElems,{frame=f,label=lbl,tabName=tCfg.Name,sec=secName}) end
-
-			function E:AddLabel(text)
-				local f=N("TextLabel",{Parent=par,Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,
-					Text=text or "",Font=Enum.Font.Gotham,TextSize=12,TextColor3=ZNX.Theme.TxB,TextXAlignment=Enum.TextXAlignment.Left})
-				B(f,"TextColor3","TxB"); reg(f,text or "label")
-				return{Set=function(_,t) f.Text=t end}
-			end
-
-			function E:AddParagraph(title,body)
-				local c=MkCard(par,0); c.AutomaticSize=Enum.AutomaticSize.Y
-				N("UIPadding",{Parent=c,PaddingLeft=UDim.new(0,12),PaddingRight=UDim.new(0,12),PaddingTop=UDim.new(0,10),PaddingBottom=UDim.new(0,10)})
-				N("UIListLayout",{Parent=c,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,4)})
-				local h=N("TextLabel",{Parent=c,Size=UDim2.new(1,0,0,18),BackgroundTransparency=1,Text=title or "",Font=Enum.Font.GothamSemibold,TextSize=13,TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Left}); B(h,"TextColor3","TxA")
-				local b=N("TextLabel",{Parent=c,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Text=body or "",Font=Enum.Font.Gotham,TextSize=12,TextWrapped=true,TextColor3=ZNX.Theme.TxB,TextXAlignment=Enum.TextXAlignment.Left}); B(b,"TextColor3","TxB")
-				reg(c,title or "paragraph")
-				return{Set=function(_,t) b.Text=t end,SetTitle=function(_,t) h.Text=t end}
-			end
-
-			function E:AddButton(bCfg)
-				bCfg=bCfg or{}; bCfg.Name=bCfg.Name or "Button"; bCfg.Callback=bCfg.Callback or function()end; bCfg.Icon=bCfg.Icon or ""
-				local c=MkCard(par,42)
-				local lbl=N("TextLabel",{Parent=c,Position=UDim2.new(0,12,0,0),Size=UDim2.new(1,-80,1,0),BackgroundTransparency=1,Text=bCfg.Name,Font=Enum.Font.GothamSemibold,TextSize=13,TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Left}); B(lbl,"TextColor3","TxA")
-				if bCfg.Icon~="" then N("ImageLabel",{Parent=c,Position=UDim2.new(1,-34,0.5,-9),Size=UDim2.new(0,18,0,18),BackgroundTransparency=1,Image=bCfg.Icon,ImageColor3=ZNX.Theme.TxB}) end
-				local btn=N("TextButton",{Parent=c,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",AutoButtonColor=false})
-				C(btn.MouseEnter,function() c.BackgroundColor3=ZNX.Theme.Bg3 end)
-				C(btn.MouseLeave,function() c.BackgroundColor3=ZNX.Theme.Bg2 end)
-				C(btn.MouseButton1Down,function() c.BackgroundColor3=ZNX.Theme.ASel end)
-				C(btn.MouseButton1Up,function() c.BackgroundColor3=ZNX.Theme.Bg3; task.spawn(bCfg.Callback) end)
-				reg(c,bCfg.Name); return{Set=function(_,t) lbl.Text=t end}
-			end
-
-			function E:AddToggle(tCfg2)
-				tCfg2=tCfg2 or{}; tCfg2.Name=tCfg2.Name or "Toggle"; tCfg2.Default=tCfg2.Default or false; tCfg2.Callback=tCfg2.Callback or function()end; tCfg2.Flag=tCfg2.Flag or nil; tCfg2.Save=tCfg2.Save or false
-				local Tog={Value=tCfg2.Default,Type="Toggle",Save=tCfg2.Save}
-				local c=MkCard(par,42)
-				local lbl=N("TextLabel",{Parent=c,Position=UDim2.new(0,12,0,0),Size=UDim2.new(1,-70,1,0),BackgroundTransparency=1,Text=tCfg2.Name,Font=Enum.Font.GothamSemibold,TextSize=13,TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Left}); B(lbl,"TextColor3","TxA")
-				
-				local toggleIner=N("Frame",{Parent=c,Position=UDim2.new(1,-58,0.5,-13),Size=UDim2.new(0,25,0,25),BackgroundColor3=ZNX.Theme.ADim,BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,3)})})
-				local toggleInner=N("Frame",{Parent=toggleIner,Position=UDim2.new(0,2,0,2),Size=UDim2.new(0,21,0,21),BackgroundColor3=ZNX.Theme.Bg2,BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,3)})})
-				local toggleBtn=N("TextButton",{Parent=toggleInner,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",AutoButtonColor=false})
-				
-				function Tog:Set(v)
-					Tog.Value=v
-					if v then
-						toggleInner.BackgroundColor3=ZNX.Theme.A
-					else
-						toggleInner.BackgroundColor3=ZNX.Theme.Bg2
-					end
-					tCfg2.Callback(Tog.Value)
-				end
-				C(toggleBtn.MouseButton1Up,function() Snd("rbxassetid://6698737249",.16); Tog:Set(not Tog.Value); SaveCfg(wCfg.ConfigName) end)
-				C(toggleBtn.MouseEnter,function() c.BackgroundColor3=ZNX.Theme.Bg3 end)
-				C(toggleBtn.MouseLeave,function() c.BackgroundColor3=ZNX.Theme.Bg2 end)
-				task.spawn(function() Tog:Set(Tog.Value) end)
-				reg(c,tCfg2.Name); if tCfg2.Flag then ZNX.Flags[tCfg2.Flag]=Tog end; return Tog
-			end
-
-			function E:AddSlider(sCfg)
-				sCfg=sCfg or{}; sCfg.Name=sCfg.Name or "Slider"; sCfg.Min=sCfg.Min or 0; sCfg.Max=sCfg.Max or 100; sCfg.Increment=sCfg.Increment or 1; sCfg.Default=Cl(sCfg.Default or sCfg.Min,sCfg.Min,sCfg.Max); sCfg.Suffix=sCfg.Suffix or ""; sCfg.Callback=sCfg.Callback or function()end; sCfg.Flag=sCfg.Flag or nil; sCfg.Save=sCfg.Save or false
-				local Sl={Value=sCfg.Default,Type="Slider",Save=sCfg.Save}; local drag=false
-				local c=MkCard(par,56)
-				N("UIPadding",{Parent=c,PaddingLeft=UDim.new(0,12),PaddingRight=UDim.new(0,12),PaddingTop=UDim.new(0,8),PaddingBottom=UDim.new(0,8)})
-				local row=N("Frame",{Parent=c,Size=UDim2.new(1,0,0,20),BackgroundTransparency=1})
-				local nl=N("TextLabel",{Parent=row,Size=UDim2.new(.6,0,1,0),BackgroundTransparency=1,Text=sCfg.Name,Font=Enum.Font.GothamSemibold,TextSize=13,TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Left}); B(nl,"TextColor3","TxA")
-				local vl=N("TextLabel",{Parent=row,Position=UDim2.new(.6,0,0,0),Size=UDim2.new(.4,0,1,0),BackgroundTransparency=1,Text=tostring(sCfg.Default)..sCfg.Suffix,Font=Enum.Font.Gotham,TextSize=12,TextColor3=ZNX.Theme.TxB,TextXAlignment=Enum.TextXAlignment.Right}); B(vl,"TextColor3","TxB")
-				local tBg=N("Frame",{Parent=c,Position=UDim2.new(0,0,0,30),Size=UDim2.new(1,0,0,8),BackgroundColor3=ZNX.Theme.BgI,BorderSizePixel=0,ZIndex=10},{N("UICorner",{CornerRadius=UDim.new(0,2)})}); B(tBg,"BackgroundColor3","BgI")
-				local tFl=N("Frame",{Parent=tBg,Size=UDim2.new(0,0,1,0),BackgroundColor3=ZNX.Theme.A,BorderSizePixel=0,ZIndex=11},{N("UICorner",{CornerRadius=UDim.new(0,2)})}); B(tFl,"BackgroundColor3","A")
-				local thumb=N("Frame",{Parent=tBg,Position=UDim2.new(0,-6,0.5,-6),Size=UDim2.new(0,12,0,12),BackgroundColor3=Color3.fromRGB(255,255,255),BorderSizePixel=0,ZIndex=12},{N("UICorner",{CornerRadius=UDim.new(0,6)}),N("UIStroke",{Color=ZNX.Theme.A,Thickness=2})})
-				local hBtn=N("TextButton",{Parent=c,ZIndex=1,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",AutoButtonColor=false})
-				function Sl:Set(v)
-					Sl.Value=Cl(Rnd(v,sCfg.Increment),sCfg.Min,sCfg.Max)
-					local pct=(Sl.Value-sCfg.Min)/math.max(sCfg.Max-sCfg.Min,.001)
-					tFl.Size=UDim2.new(pct,0,1,0); thumb.Position=UDim2.new(pct,-6,0.5,-6)
-					vl.Text=tostring(Sl.Value)..sCfg.Suffix; sCfg.Callback(Sl.Value)
-				end
-				local function getVal(inp) return sCfg.Min+(sCfg.Max-sCfg.Min)*Cl((inp.Position.X-tBg.AbsolutePosition.X)/math.max(tBg.AbsoluteSize.X,1),0,1) end
-				C(tBg.InputBegan,function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 then drag=true; Sl:Set(getVal(inp)) end end)
-				C(UIS.InputChanged,function(inp) if drag and inp.UserInputType==Enum.UserInputType.MouseMovement then Sl:Set(getVal(inp)) end end)
-				C(UIS.InputEnded,function(inp) if drag and inp.UserInputType==Enum.UserInputType.MouseButton1 then drag=false; SaveCfg(wCfg.ConfigName) end end)
-				Sl:Set(Sl.Value); reg(c,sCfg.Name); if sCfg.Flag then ZNX.Flags[sCfg.Flag]=Sl end; return Sl
-			end
-
-			function E:AddDropdown(dCfg)
-				dCfg=dCfg or{}; dCfg.Name=dCfg.Name or "Dropdown"; dCfg.Options=dCfg.Options or{}; dCfg.Default=dCfg.Default or""; dCfg.Callback=dCfg.Callback or function()end; dCfg.Flag=dCfg.Flag or nil; dCfg.Save=dCfg.Save or false
-				local DD={Value=dCfg.Default,Options=dCfg.Options,Buttons={},Type="Dropdown",Save=dCfg.Save}
-				if not table.find(DD.Options,DD.Value) then DD.Value=DD.Options[1] or "" end
-				local outer,selL,arr,sep,sc,ol,hb=MkDrop(par,dCfg.Name)
-				selL.Text=tostring(DD.Value); local tog,MaxH=false,6
-				local function Refresh()
-					for _,b in pairs(DD.Buttons) do b:Destroy() end; DD.Buttons={}
-					for _,opt in ipairs(DD.Options) do
-						local isSel=opt==DD.Value
-						local ob=N("TextButton",{Parent=sc,Size=UDim2.new(1,0,0,28),BackgroundColor3=isSel and ZNX.Theme.ADim or ZNX.Theme.Bg3,BorderSizePixel=0,Text="",AutoButtonColor=false},{N("UICorner",{CornerRadius=UDim.new(0,2)})})
-						N("TextLabel",{Parent=ob,Position=UDim2.new(0,8,0,0),Size=UDim2.new(1,-8,1,0),BackgroundTransparency=1,Text=tostring(opt),Font=Enum.Font.Gotham,TextSize=12,TextColor3=isSel and ZNX.Theme.TxA or ZNX.Theme.TxB,TextXAlignment=Enum.TextXAlignment.Left})
-						C(ob.MouseButton1Up,function() DD:Set(opt); SaveCfg(wCfg.ConfigName) end)
-						C(ob.MouseEnter,function() ob.BackgroundColor3=ZNX.Theme.Bg4 end)
-						C(ob.MouseLeave,function() ob.BackgroundColor3=isSel and ZNX.Theme.ADim or ZNX.Theme.Bg3 end)
-						DD.Buttons[opt]=ob
-					end
-				end
-				function DD:Set(v)
-					DD.Value=table.find(DD.Options,v) and v or(DD.Options[1] or""); selL.Text=tostring(DD.Value)
-					for opt,ob in pairs(DD.Buttons) do local s2=opt==DD.Value; ob.BackgroundColor3=s2 and ZNX.Theme.ADim or ZNX.Theme.Bg3; local l=ob:FindFirstChildOfClass("TextLabel"); if l then l.TextColor3=s2 and ZNX.Theme.TxA or ZNX.Theme.TxB end end
-					dCfg.Callback(DD.Value)
-				end
-				function DD:Refresh(opts,clear) if clear then DD.Options={} end; for _,o in ipairs(opts) do table.insert(DD.Options,o) end; Refresh() end
-				C(hb.MouseButton1Up,function() tog=not tog; sep.Visible=tog; Tw(arr,TI.Fast,{Rotation=tog and 180 or 0}); Tw(outer,TI.Mid,{Size=tog and UDim2.new(1,0,0,42+math.min(#DD.Options*32+8,MaxH*32+8)) or UDim2.new(1,0,0,42)}) end)
-				Refresh(); DD:Set(DD.Value); reg(outer,dCfg.Name); if dCfg.Flag then ZNX.Flags[dCfg.Flag]=DD end; return DD
-			end
-
-			function E:AddMultipleDropdown(dCfg)
-				dCfg=dCfg or{}; dCfg.Name=dCfg.Name or "Dropdown"; dCfg.Options=dCfg.Options or{}; dCfg.Callback=dCfg.Callback or function()end; dCfg.Flag=dCfg.Flag or nil; dCfg.Save=dCfg.Save or false
-				local DD={Value=nil,Options=dCfg.Options,Buttons={},Type="Dropdown",Save=dCfg.Save}
-				local MaxEl,selArr,tog=5,{},false
-				local outer,selL,arr,sep,sc,ol,hb=MkDrop(par,dCfg.Name); selL.Text="Selecione"
-				local function AddOpts(opts)
-					for _,opt in pairs(opts) do
-						local isSel=table.find(selArr,opt)~=nil
-						local ob=N("TextButton",{Parent=sc,Size=UDim2.new(1,0,0,28),BackgroundColor3=isSel and ZNX.Theme.ADim or ZNX.Theme.Bg3,BorderSizePixel=0,Text="",AutoButtonColor=false},{N("UICorner",{CornerRadius=UDim.new(0,2)})})
-						local chk=N("Frame",{Parent=ob,Position=UDim2.new(0,6,0.5,-6),Size=UDim2.new(0,12,0,12),BackgroundColor3=isSel and ZNX.Theme.A or ZNX.Theme.BgI,BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,2)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1})})
-						if isSel then N("TextLabel",{Parent=chk,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="✓",Font=Enum.Font.Gotham,TextSize=9,TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Center}) end
-						N("TextLabel",{Parent=ob,Position=UDim2.new(0,24,0,0),Size=UDim2.new(1,-28,1,0),BackgroundTransparency=1,Text=tostring(opt),Font=Enum.Font.Gotham,TextSize=12,TextColor3=isSel and ZNX.Theme.TxA or ZNX.Theme.TxB,TextXAlignment=Enum.TextXAlignment.Left})
-						C(ob.MouseButton1Up,function() DD:Set(opt); SaveCfg(wCfg.ConfigName) end)
-						C(ob.MouseEnter,function() ob.BackgroundColor3=ZNX.Theme.Bg4 end)
-						C(ob.MouseLeave,function() ob.BackgroundColor3=table.find(selArr,opt) and ZNX.Theme.ADim or ZNX.Theme.Bg3 end)
-						DD.Buttons[opt]=ob
-					end
-				end
-				function DD:Refresh(opts,del) if del then for _,bk in pairs(DD.Buttons) do bk:Destroy() end; table.clear(DD.Options); table.clear(DD.Buttons) end; DD.Options=opts; AddOpts(DD.Options) end
-				function DD:Set(val)
-					local n=table.find(selArr,val); local btn=DD.Buttons[val]; local l=btn and btn:FindFirstChildOfClass("TextLabel")
-					if not n then table.insert(selArr,val); if btn then btn.BackgroundColor3=ZNX.Theme.ADim end; if l then l.TextColor3=ZNX.Theme.TxA end
-					else table.remove(selArr,n); if btn then btn.BackgroundColor3=ZNX.Theme.Bg3 end; if l then l.TextColor3=ZNX.Theme.TxB end end
-					local txt=""; for i,v in pairs(selArr) do txt=txt..(i==#selArr and v or v..", ") end
-					DD.Value=val; selL.Text=#selArr>0 and txt or "Selecione"; return dCfg.Callback(selArr)
-				end
-				C(hb.MouseButton1Up,function() tog=not tog; sep.Visible=tog; Tw(arr,TI.Fast,{Rotation=tog and 180 or 0}); Tw(outer,TI.Mid,{Size=UDim2.new(1,0,0,tog and(#DD.Options>MaxEl and 42+MaxEl*32 or ol.AbsoluteContentSize.Y+42) or 42)}) end)
-				DD:Refresh(DD.Options,false); reg(outer,dCfg.Name); if dCfg.Flag then ZNX.Flags[dCfg.Flag]=DD end; return DD
-			end
-
-			-- PLAYERS DROPDOWN (estilo Orion)
-			function E:AddPlayersDropdown(dCfg)
-				dCfg = dCfg or {}
-				dCfg.Name = dCfg.Name or "Jogadores"
-				dCfg.Callback = dCfg.Callback or function() end
-				dCfg.Flag = dCfg.Flag or nil
-				dCfg.MultipleSelection = dCfg.MultipleSelection or false
-				dCfg.Save = false
-
-				local DD = {
-					Value = nil,
-					Buttons = {},
-					Type = "PlayersDropdown",
-					Save = false,
-					MultipleSelection = dCfg.MultipleSelection,
-					SelectedPlayers = {},
-					PendingReconnect = {},
-				}
-				
-				local MaxEl, Opts, tog = 4, 0, false
-				local outer, selL, arr, sep, sc, ol, hb = MkDrop(par, dCfg.Name)
-				selL.Text = "Selecione"
-				
-				local function SelBg() return ZNX.Theme.ADim end
-				
-				local function IsInFolder(p)
-					local ch = p.Character
-					if not ch then return false end
-					return ch.Parent and ch.Parent:IsA("Folder")
-				end
-				
-				local function UpdateSelectedText()
-					local txt = ""
-					local playersToShow = {}
-					
-					for i, playerName in ipairs(DD.SelectedPlayers) do
-						if i <= 3 then
-							table.insert(playersToShow, playerName)
-						end
-					end
-					
-					if #playersToShow > 0 then
-						txt = table.concat(playersToShow, ", ")
-						if #DD.SelectedPlayers > 3 then
-							txt = txt .. " +" .. (#DD.SelectedPlayers - 3)
-						end
-					end
-					
-					selL.Text = #DD.SelectedPlayers > 0 and txt or "Selecione"
-					dCfg.Callback(DD.SelectedPlayers)
-				end
-				
-				local function ApplySel(btn, sel)
-					if sel then
-						btn.BackgroundColor3 = SelBg()
-						for _, l in ipairs(btn:GetChildren()) do
-							if l:IsA("TextLabel") and l.Font == Enum.Font.GothamSemibold then
-								l.TextColor3 = ZNX.Theme.TxA
-							end
-						end
-					else
-						btn.BackgroundColor3 = ZNX.Theme.Bg2
-						for _, l in ipairs(btn:GetChildren()) do
-							if l:IsA("TextLabel") and l.Font == Enum.Font.GothamSemibold then
-								l.TextColor3 = ZNX.Theme.TxA
-							end
-						end
-					end
-				end
-				
-				local function AddToSelection(playerName)
-					local player = Players:FindFirstChild(playerName)
-					if not player then
-						if not DD.PendingReconnect[playerName] then
-							DD.PendingReconnect[playerName] = true
-						end
-						return
-					end
-					
-					if DD.MultipleSelection then
-						if not table.find(DD.SelectedPlayers, playerName) then
-							table.insert(DD.SelectedPlayers, playerName)
-							UpdateSelectedText()
-						end
-					else
-						for _, name in ipairs(DD.SelectedPlayers) do
-							local oldBtn = DD.Buttons[name]
-							if oldBtn and not oldBtn:GetAttribute("DC") then
-								ApplySel(oldBtn, false)
-							end
-						end
-						DD.SelectedPlayers = {playerName}
-						UpdateSelectedText()
-					end
-					
-					DD.PendingReconnect[playerName] = nil
-				end
-				
-				local function RemoveFromSelection(playerName)
-					local idx = table.find(DD.SelectedPlayers, playerName)
-					if idx then
-						table.remove(DD.SelectedPlayers, idx)
-						UpdateSelectedText()
-					end
-					DD.PendingReconnect[playerName] = nil
-				end
-				
-				local function OnPlayerLeft(playerName)
-					local wasSelected = table.find(DD.SelectedPlayers, playerName) ~= nil
-					
-					if wasSelected then
-						local idx = table.find(DD.SelectedPlayers, playerName)
-						if idx then
-							table.remove(DD.SelectedPlayers, idx)
-							UpdateSelectedText()
-						end
-						DD.PendingReconnect[playerName] = true
-						
-						local btn = DD.Buttons[playerName]
-						if btn and btn.Parent then
-							btn.BackgroundColor3 = Color3.fromRGB(60,20,20)
-							local di = btn:FindFirstChild("DisIco")
-							if di then di.Visible = true end
-							for _, l in ipairs(btn:GetChildren()) do
-								if l:IsA("TextLabel") then
-									l.TextColor3 = Color3.fromRGB(210,100,100)
-								end
-							end
-							btn:SetAttribute("DC", true)
-						end
-					else
-						local btn = DD.Buttons[playerName]
-						if btn and btn.Parent then
-							btn:Destroy()
-							DD.Buttons[playerName] = nil
-							Opts = Opts - 1
-						end
-					end
-				end
-				
-				local function OnPlayerReconnect(playerName, p)
-					if DD.PendingReconnect[playerName] then
-						if DD.MultipleSelection then
-							if not table.find(DD.SelectedPlayers, playerName) then
-								table.insert(DD.SelectedPlayers, playerName)
-								UpdateSelectedText()
-							end
-						else
-							for _, name in ipairs(DD.SelectedPlayers) do
-								local oldBtn = DD.Buttons[name]
-								if oldBtn and not oldBtn:GetAttribute("DC") then
-									ApplySel(oldBtn, false)
-								end
-							end
-							DD.SelectedPlayers = {playerName}
-							UpdateSelectedText()
-						end
-						DD.PendingReconnect[playerName] = nil
-						
-						local btn = DD.Buttons[playerName]
-						if btn then
-							btn:SetAttribute("DC", false)
-							local di = btn:FindFirstChild("DisIco")
-							if di then di.Visible = false end
-							ApplySel(btn, true)
-						end
-						
-						ZNX:Notify({
-							Title = "🔄 Reconectou",
-							Message = playerName .. " reconectado",
-							Duration = 2,
-							Type = "info"
-						})
-					else
-						if not DD.Buttons[playerName] then
-							AddPlayerOption(p)
-						end
-					end
-				end
-				
-				local function AddPlayerOption(p)
-					local pn = p.Name
-					local pd = p.DisplayName
-					local uid = p.UserId
-					
-					local existingBtn = DD.Buttons[pn]
-					if existingBtn then
-						if existingBtn:GetAttribute("DC") then
-							OnPlayerReconnect(pn, p)
-						end
-						return
-					end
-					
-					local isSelected = table.find(DD.SelectedPlayers, pn) ~= nil
-					local inFolder = IsInFolder(p)
-					
-					if DD.PendingReconnect[pn] then
-						isSelected = true
-						table.insert(DD.SelectedPlayers, pn)
-						DD.PendingReconnect[pn] = nil
-						UpdateSelectedText()
-					end
-					
-					local ob = N("TextButton", {
-						Parent = sc,
-						Size = UDim2.new(1, 0, 0, 48),
-						BackgroundColor3 = isSelected and SelBg() or ZNX.Theme.Bg2,
-						BorderSizePixel = 0,
-						Text = "",
-						AutoButtonColor = false
-					}, {
-						N("UICorner", {CornerRadius = UDim.new(0, 3)}),
-						N("UIStroke", {Color = ZNX.Theme.Line, Thickness = 1}),
-					})
-					
-					N("ImageLabel", {
-						Parent = ob,
-						Position = UDim2.new(0, 8, 0.5, -16),
-						Size = UDim2.new(0, 32, 0, 32),
-						BackgroundTransparency = 1,
-						Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. uid .. "&width=420&height=420&format=png"
-					}, {
-						N("UICorner", {CornerRadius = UDim.new(0, 3)}),
-						N("UIStroke", {Color = ZNX.Theme.Line, Thickness = 1}),
-					})
-					
-					N("ImageLabel", {
-						Parent = ob,
-						Name = "DisIco",
-						Position = UDim2.new(1, -26, 0.5, -10),
-						Size = UDim2.new(0, 20, 0, 20),
-						BackgroundTransparency = 1,
-						Image = "rbxassetid://4988112250",
-						ImageColor3 = Color3.fromRGB(240,80,80),
-						Visible = false
-					})
-					
-					if inFolder then
-						N("ImageLabel", {
-							Parent = ob,
-							Name = "FolderIco",
-							Position = UDim2.new(1, -50, 0.5, -8),
-							Size = UDim2.new(0, 16, 0, 16),
-							BackgroundTransparency = 1,
-							Image = "rbxassetid://6693712941",
-							ImageColor3 = Color3.fromRGB(80,180,255),
-						})
-					end
-					
-					N("TextLabel", {
-						Parent = ob,
-						Name = "NL",
-						Position = UDim2.new(0, 48, 0, 8),
-						Size = UDim2.new(1, -70, 0, 18),
-						BackgroundTransparency = 1,
-						Text = pd,
-						Font = Enum.Font.GothamSemibold,
-						TextSize = 12,
-						TextColor3 = isSelected and ZNX.Theme.TxA or ZNX.Theme.TxA,
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextTruncate = Enum.TextTruncate.AtEnd
-					})
-					
-					N("TextLabel", {
-						Parent = ob,
-						Position = UDim2.new(0, 48, 0, 26),
-						Size = UDim2.new(1, -70, 0, 14),
-						BackgroundTransparency = 1,
-						Text = "@" .. pn,
-						Font = Enum.Font.Gotham,
-						TextSize = 10,
-						TextColor3 = ZNX.Theme.TxC,
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextTruncate = Enum.TextTruncate.AtEnd
-					})
-					
-					task.spawn(function()
-						while ob and ob.Parent do
-							task.wait(2.5)
-							if not ob or not ob.Parent then break end
-							local fi = ob:FindFirstChild("FolderIco")
-							if fi then fi.Visible = IsInFolder(p) end
-						end
-					end)
-					
-					C(ob.MouseButton1Up, function()
-						if ob:GetAttribute("DC") then
-							DD.PendingReconnect[pn] = nil
-							RemoveFromSelection(pn)
-							ob:Destroy()
-							DD.Buttons[pn] = nil
-							Opts = Opts - 1
-							return
-						end
-						DD:Set(pn)
-					end)
-					
-					C(ob.MouseEnter, function()
-						if ob:GetAttribute("DC") then
-							ob.BackgroundColor3 = Color3.fromRGB(80,30,30)
-							return
-						end
-						if table.find(DD.SelectedPlayers, pn) then return end
-						ob.BackgroundColor3 = ZNX.Theme.Bg3
-					end)
-					
-					C(ob.MouseLeave, function()
-						if ob:GetAttribute("DC") then
-							ob.BackgroundColor3 = Color3.fromRGB(60,20,20)
-							return
-						end
-						ob.BackgroundColor3 = table.find(DD.SelectedPlayers, pn) and SelBg() or ZNX.Theme.Bg2
-					end)
-					
-					DD.Buttons[pn] = ob
-					Opts = Opts + 1
-				end
-				
-				for _, p in pairs(Players:GetPlayers()) do
-					if p ~= LP then
-						AddPlayerOption(p)
-					end
-				end
-				
-				C(Players.PlayerAdded, function(p)
-					if p ~= LP then
-						AddPlayerOption(p)
-					end
-				end)
-				
-				C(Players.PlayerRemoving, function(p)
-					task.delay(0.1, function()
-						OnPlayerLeft(p.Name)
-					end)
-				end)
-				
-				function DD:Refresh() end
-				
-				function DD:Set(val, once)
-					local btn = DD.Buttons[val]
-					if not btn then
-						for _ = 0, 10 do
-							task.wait(0.15)
-							if DD.Buttons[val] then
-								btn = DD.Buttons[val]
-								break
-							end
-						end
-					end
-					
-					if not btn then return end
-					
-					if btn:GetAttribute("DC") then
-						ZNX:Notify({
-							Title = "⚠️ Offline",
-							Message = val .. " está offline",
-							Duration = 2,
-							Type = "warn"
-						})
-						return
-					end
-					
-					local isSelected = table.find(DD.SelectedPlayers, val) ~= nil
-					
-					if DD.MultipleSelection then
-						if not isSelected then
-							AddToSelection(val)
-							ApplySel(btn, true)
-						elseif not once then
-							RemoveFromSelection(val)
-							ApplySel(btn, false)
-						end
-					else
-						if not isSelected then
-							for _, name in ipairs(DD.SelectedPlayers) do
-								local oldBtn = DD.Buttons[name]
-								if oldBtn and not oldBtn:GetAttribute("DC") then
-									ApplySel(oldBtn, false)
-								end
-							end
-							AddToSelection(val)
-							ApplySel(btn, true)
-						end
-					end
-					
-					DD.Value = val
-				end
-				
-				C(hb.MouseButton1Up, function()
-					DD.Toggled = not DD.Toggled
-					sep.Visible = DD.Toggled
-					Tw(arr, TI.Fast, {Rotation = DD.Toggled and 180 or 0})
-					Tw(outer, TI.Mid, {
-						Size = UDim2.new(1, 0, 0, DD.Toggled and (Opts > MaxEl and 42 + MaxEl * 52 or 42 + Opts * 52) or 42)
-					})
-				end)
-				
-				reg(outer, dCfg.Name)
-				if dCfg.Flag then ZNX.Flags[dCfg.Flag] = DD end
-				return DD
-			end
-			
-			function E:AddPlayerDropdown(pdCfg)
-				pdCfg=pdCfg or{}; pdCfg.Name=pdCfg.Name or "Jogadores"; pdCfg.Callback=pdCfg.Callback or function()end; pdCfg.Flag=pdCfg.Flag or nil; pdCfg.Save=pdCfg.Save or false
-				local DD={Value=nil,Buttons={},SelP={},Type="PlayerDropdown",Save=pdCfg.Save}; local MaxEl,tog=5,false
-				local function SelBg() return ZNX.Theme.ADim end
-				local outer,selL,arr,sep,sc,ol,hb=MkDrop(par,pdCfg.Name); selL.Text="Selecione"
-				local function AddOpts(pl)
-					for _,p in ipairs(pl) do
-						local isSel=DD.SelP[p]
-						local ob=N("TextButton",{Parent=sc,Size=UDim2.new(1,0,0,44),BackgroundColor3=isSel and SelBg() or ZNX.Theme.Bg2,BorderSizePixel=0,Text="",AutoButtonColor=false},{N("UICorner",{CornerRadius=UDim.new(0,3)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1})})
-						N("ImageLabel",{Parent=ob,Position=UDim2.new(0,8,0.5,-14),Size=UDim2.new(0,28,0,28),BackgroundTransparency=1,Image="https://www.roblox.com/headshot-thumbnail/image?userId="..p.UserId.."&width=420&height=420&format=png"},{N("UICorner",{CornerRadius=UDim.new(0,3)})})
-						local dl=N("TextLabel",{Parent=ob,Position=UDim2.new(0,44,0,6),Size=UDim2.new(1,-48,0,18),BackgroundTransparency=1,Text=p.DisplayName,Font=Enum.Font.GothamSemibold,TextSize=12,TextColor3=isSel and ZNX.Theme.TxA or ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd})
-						N("TextLabel",{Parent=ob,Position=UDim2.new(0,44,0,24),Size=UDim2.new(1,-48,0,14),BackgroundTransparency=1,Text="@"..p.Name,Font=Enum.Font.Gotham,TextSize=10,TextColor3=ZNX.Theme.TxC,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd})
-						C(ob.MouseButton1Up,function() DD.SelP[p]=DD.SelP[p] and nil or true; DD:Set(); if pdCfg.Save then SaveCfg(wCfg.ConfigName) end end)
-						C(ob.MouseEnter,function() if not DD.SelP[p] then ob.BackgroundColor3=ZNX.Theme.Bg3 end end)
-						C(ob.MouseLeave,function() ob.BackgroundColor3=DD.SelP[p] and SelBg() or ZNX.Theme.Bg2 end)
-						DD.Buttons[p]=ob
-					end
-				end
-				function DD:Refresh(list,clear) if clear then for _,btn in pairs(self.Buttons) do btn:Destroy() end; table.clear(self.Buttons) end; AddOpts(list) end
-				function DD:Set()
-					local su={}; for p in pairs(self.SelP) do if Players:FindFirstChild(p.Name) then table.insert(su,p.Name) else self.SelP[p]=nil end end; selL.Text=#su>0 and table.concat(su,", ") or "Selecione"
-					for p,btn in pairs(self.Buttons) do local isSel=self.SelP[p]; btn.BackgroundColor3=isSel and SelBg() or ZNX.Theme.Bg2; local dl=btn:FindFirstChildOfClass("TextLabel"); if dl and dl.Font==Enum.Font.GothamSemibold then dl.TextColor3=isSel and ZNX.Theme.TxA or ZNX.Theme.TxA end end
-					return pdCfg.Callback(su)
-				end
-				C(hb.MouseButton1Up,function() tog=not tog; sep.Visible=tog; Tw(arr,TI.Fast,{Rotation=tog and 180 or 0}); Tw(outer,TI.Mid,{Size=UDim2.new(1,0,0,42+(tog and math.min(ol.AbsoluteContentSize.Y,MaxEl*48) or 0))}) end)
-				local function UpdList() local pl={}; for _,p in ipairs(Players:GetPlayers()) do if p~=LP then table.insert(pl,p) end end; DD:Refresh(pl,true); DD:Set() end
-				C(Players.PlayerAdded,UpdList); C(Players.PlayerRemoving,UpdList); UpdList()
-				reg(outer,pdCfg.Name); if pdCfg.Flag then ZNX.Flags[pdCfg.Flag]=DD end; return DD
-			end
-
-			function E:AddTextbox(xCfg)
-				xCfg=xCfg or{}; xCfg.Name=xCfg.Name or "Textbox"; xCfg.Default=xCfg.Default or""; xCfg.Placeholder=xCfg.Placeholder or"Digite..."; xCfg.ClearOnSubmit=xCfg.ClearOnSubmit or false; xCfg.Callback=xCfg.Callback or function()end
-				local c=MkCard(par,42)
-				local lbl=N("TextLabel",{Parent=c,Position=UDim2.new(0,12,0,0),Size=UDim2.new(0,100,1,0),BackgroundTransparency=1,Text=xCfg.Name,Font=Enum.Font.GothamSemibold,TextSize=13,TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Left}); B(lbl,"TextColor3","TxA")
-				local ibg=N("Frame",{Parent=c,Position=UDim2.new(.42,0,0.5,-12),Size=UDim2.new(.56,0,0,24),BackgroundColor3=ZNX.Theme.BgI,BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,2)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1})}); B(ibg,"BackgroundColor3","BgI")
-				local tb2=N("TextBox",{Parent=ibg,Position=UDim2.new(0,8,0,0),Size=UDim2.new(1,-16,1,0),BackgroundTransparency=1,Text=xCfg.Default,PlaceholderText=xCfg.Placeholder,PlaceholderColor3=ZNX.Theme.TxC,Font=Enum.Font.Gotham,TextSize=12,TextColor3=ZNX.Theme.TxA,ClearTextOnFocus=false,TextXAlignment=Enum.TextXAlignment.Left}); B(tb2,"TextColor3","TxA")
-				C(tb2.Focused,function() ibg:FindFirstChildOfClass("UIStroke").Color=ZNX.Theme.A end)
-				C(tb2.FocusLost,function() ibg:FindFirstChildOfClass("UIStroke").Color=ZNX.Theme.Line; xCfg.Callback(tb2.Text); if xCfg.ClearOnSubmit then tb2.Text="" end end)
-				reg(c,xCfg.Name)
-			end
-
-			function E:AddBind(bCfg)
-				bCfg=bCfg or{}; bCfg.Name=bCfg.Name or "Keybind"; bCfg.Default=bCfg.Default or Enum.KeyCode.Unknown; bCfg.Hold=bCfg.Hold or false; bCfg.Callback=bCfg.Callback or function()end; bCfg.Flag=bCfg.Flag or nil; bCfg.Save=bCfg.Save or false
-				local BL={Enum.KeyCode.Unknown,Enum.KeyCode.W,Enum.KeyCode.A,Enum.KeyCode.S,Enum.KeyCode.D,Enum.KeyCode.Slash,Enum.KeyCode.Tab,Enum.KeyCode.Backspace,Enum.KeyCode.Escape,Enum.KeyCode.Up,Enum.KeyCode.Down,Enum.KeyCode.Left,Enum.KeyCode.Right}
-				local function InBL(k) for _,v in pairs(BL) do if v==k then return true end end end
-				local BO={Value=bCfg.Default.Name or tostring(bCfg.Default),Binding=false,Holding=false,Type="Bind",Save=bCfg.Save}
-				local c=MkCard(par,42)
-				local lbl=N("TextLabel",{Parent=c,Position=UDim2.new(0,12,0,0),Size=UDim2.new(1,-110,1,0),BackgroundTransparency=1,Text=bCfg.Name,Font=Enum.Font.GothamSemibold,TextSize=13,TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Left}); B(lbl,"TextColor3","TxA")
-				local kbg=N("Frame",{Parent=c,Position=UDim2.new(1,-86,0.5,-14),Size=UDim2.new(0,74,0,28),BackgroundColor3=ZNX.Theme.BgI,BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,2)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1})}); B(kbg,"BackgroundColor3","BgI")
-				local kl=N("TextLabel",{Parent=kbg,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=BO.Value,Font=Enum.Font.Gotham,TextSize=12,TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Center}); B(kl,"TextColor3","TxA")
-				local btn=N("TextButton",{Parent=c,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",AutoButtonColor=false})
-				C(btn.MouseEnter,function() c.BackgroundColor3=ZNX.Theme.Bg3 end)
-				C(btn.MouseLeave,function() c.BackgroundColor3=ZNX.Theme.Bg2 end)
-				C(btn.InputEnded,function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 and not BO.Binding then BO.Binding=true; kl.Text="..."; Tw(kbg:FindFirstChildOfClass("UIStroke"),TI.Fast,{Color=ZNX.Theme.A}) end end)
-				C(UIS.InputBegan,function(i,gp) if gp then return end; if BO.Binding then local K; pcall(function() if not InBL(i.KeyCode) then K=i.KeyCode end end); K=K or BO.Value; BO:Set(K); Tw(kbg:FindFirstChildOfClass("UIStroke"),TI.Fast,{Color=ZNX.Theme.Line}); SaveCfg(wCfg.ConfigName) elseif i.KeyCode.Name==BO.Value or i.UserInputType.Name==BO.Value then if bCfg.Hold then BO.Holding=true; bCfg.Callback(true) else bCfg.Callback() end end end)
-				C(UIS.InputEnded,function(i) if (i.KeyCode.Name==BO.Value or i.UserInputType.Name==BO.Value) and bCfg.Hold and BO.Holding then BO.Holding=false; bCfg.Callback(false) end end)
-				function BO:Set(k) BO.Binding=false; BO.Value=(type(k)=="string") and k or(k.Name or tostring(k)); kl.Text=BO.Value end
-				BO:Set(bCfg.Default); reg(c,bCfg.Name); if bCfg.Flag then ZNX.Flags[bCfg.Flag]=BO end; return BO
-			end
-
-			function E:AddColorpicker(cpCfg)
-				cpCfg=cpCfg or{}; cpCfg.Name=cpCfg.Name or "Cor"; cpCfg.Default=cpCfg.Default or Color3.fromRGB(181,1,31); cpCfg.Callback=cpCfg.Callback or function()end; cpCfg.Flag=cpCfg.Flag or nil; cpCfg.Save=cpCfg.Save or false; cpCfg.ThemeKey=cpCfg.ThemeKey or nil
-				local CP={Value=cpCfg.Default,Toggled=false,Type="Colorpicker",Save=cpCfg.Save}
-				local H,S,V=Color3.toHSV(cpCfg.Default)
-				local outer=N("Frame",{Parent=par,Size=UDim2.new(1,0,0,42),BackgroundColor3=ZNX.Theme.Bg2,BorderSizePixel=0,ClipsDescendants=true},{N("UICorner",{CornerRadius=UDim.new(0,3)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1})})
-				B(outer,"BackgroundColor3","Bg2")
-				local hdr=N("Frame",{Parent=outer,Size=UDim2.new(1,0,0,42),BackgroundTransparency=1})
-				local nl=N("TextLabel",{Parent=hdr,Position=UDim2.new(0,12,0,0),Size=UDim2.new(1,-70,1,0),BackgroundTransparency=1,Text=cpCfg.Name,Font=Enum.Font.GothamSemibold,TextSize=13,TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Left}); B(nl,"TextColor3","TxA")
-				local prev=N("Frame",{Parent=hdr,Position=UDim2.new(1,-50,0.5,-14),Size=UDim2.new(0,28,0,28),BackgroundColor3=cpCfg.Default,BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,3)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1})})
-				local ar2=N("ImageLabel",{Parent=hdr,Position=UDim2.new(1,-24,0.5,-8),Size=UDim2.new(0,16,0,16),BackgroundTransparency=1,Image="rbxassetid://5165666242",ImageColor3=ZNX.Theme.TxC})
-				local sep2=N("Frame",{Parent=outer,Position=UDim2.new(0,0,0,42),Size=UDim2.new(1,0,0,1),BackgroundColor3=ZNX.Theme.Line,BorderSizePixel=0,Visible=false})
-				local pa=N("Frame",{Parent=outer,Position=UDim2.new(0,10,0,50),Size=UDim2.new(1,-20,0,110),BackgroundTransparency=1,Visible=false})
-				local svb=N("ImageLabel",{Parent=pa,Size=UDim2.new(1,-30,1,0),Image="rbxassetid://4155801252",BackgroundColor3=Color3.fromHSV(H,1,1),BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,2)})})
-				local svp=N("Frame",{Parent=svb,Position=UDim2.new(S,0,1-V,0),Size=UDim2.new(0,12,0,12),BackgroundColor3=Color3.fromRGB(255,255,255),BorderSizePixel=0,AnchorPoint=Vector2.new(0.5,0.5)},{N("UICorner",{CornerRadius=UDim.new(0,6)}),N("UIStroke",{Color=Color3.fromRGB(20,20,20),Thickness=2})})
-				local hb2=N("Frame",{Parent=pa,Position=UDim2.new(1,-24,0,0),Size=UDim2.new(0,18,1,0),BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,2)}),N("UIGradient",{Rotation=270,Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB(255,0,4)),ColorSequenceKeypoint.new(.17,Color3.fromRGB(255,255,0)),ColorSequenceKeypoint.new(.33,Color3.fromRGB(0,255,0)),ColorSequenceKeypoint.new(.5,Color3.fromRGB(0,255,255)),ColorSequenceKeypoint.new(.67,Color3.fromRGB(0,0,255)),ColorSequenceKeypoint.new(.83,Color3.fromRGB(255,0,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(255,0,4))}})})
-				local hp2=N("Frame",{Parent=hb2,Position=UDim2.new(0.5,0,1-H,0),Size=UDim2.new(1,4,0,3),AnchorPoint=Vector2.new(0.5,0.5),BackgroundColor3=Color3.fromRGB(255,255,255),BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,1)}),N("UIStroke",{Color=Color3.fromRGB(20,20,20),Thickness=1})})
-				local function UpdCP() local c2=Color3.fromHSV(H,S,V); CP.Value=c2; prev.BackgroundColor3=c2; svb.BackgroundColor3=Color3.fromHSV(H,1,1); cpCfg.Callback(c2); SaveCfg(wCfg.ConfigName) end
-				local svD,svI=false; C(svb.InputBegan,function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then svD=true; i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then svD=false end end) end end); C(svb.InputChanged,function(i) if i.UserInputType==Enum.UserInputType.MouseMovement then svI=i end end); C(UIS.InputChanged,function(i) if svD and i==svI then S=Cl((i.Position.X-svb.AbsolutePosition.X)/math.max(svb.AbsoluteSize.X,1),0,1); V=1-Cl((i.Position.Y-svb.AbsolutePosition.Y)/math.max(svb.AbsoluteSize.Y,1),0,1); svp.Position=UDim2.new(S,0,1-V,0); UpdCP() end end)
-				local hD,hI=false; C(hb2.InputBegan,function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then hD=true; i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then hD=false end end) end end); C(hb2.InputChanged,function(i) if i.UserInputType==Enum.UserInputType.MouseMovement then hI=i end end); C(UIS.InputChanged,function(i) if hD and i==hI then H=1-Cl((i.Position.Y-hb2.AbsolutePosition.Y)/math.max(hb2.AbsoluteSize.Y,1),0,1); hp2.Position=UDim2.new(0.5,0,1-H,0); UpdCP() end end)
-				local tog2=N("TextButton",{Parent=hdr,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",AutoButtonColor=false})
-				C(tog2.MouseButton1Up,function() CP.Toggled=not CP.Toggled; sep2.Visible=CP.Toggled; pa.Visible=CP.Toggled; Tw(ar2,TI.Fast,{Rotation=CP.Toggled and 180 or 0}); Tw(outer,TI.Mid,{Size=CP.Toggled and UDim2.new(1,0,0,172) or UDim2.new(1,0,0,42)}) end)
-				function CP:Set(c2)
-					CP.Value=c2; H,S,V=Color3.toHSV(c2); prev.BackgroundColor3=c2
-					svb.BackgroundColor3=Color3.fromHSV(H,1,1); svp.Position=UDim2.new(S,0,1-V,0); hp2.Position=UDim2.new(0.5,0,1-H,0)
-					cpCfg.Callback(c2)
-				end
-				if cpCfg.ThemeKey then
-					table.insert(ZNX.Watch,function()
-						if not outer or not outer.Parent then return end
-						local newCol=ZNX.Theme[cpCfg.ThemeKey]; if not newCol then return end
-						if newCol~=CP.Value then
-							CP.Value=newCol; local nh,ns,nv=Color3.toHSV(newCol)
-							H,S,V=nh,ns,nv; prev.BackgroundColor3=newCol
-							svb.BackgroundColor3=Color3.fromHSV(H,1,1); svp.Position=UDim2.new(S,0,1-V,0); hp2.Position=UDim2.new(0.5,0,1-H,0)
-						end
-					end)
-				end
-				CP:Set(cpCfg.Default); reg(outer,cpCfg.Name); if cpCfg.Flag then ZNX.Flags[cpCfg.Flag]=CP end; return CP
-			end
-
-			function E:AddSection(sCfg)
-				sCfg=sCfg or{}; sCfg.Name=sCfg.Name or "Section"
-				local wrap=N("Frame",{Parent=par,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1})
-				N("UIListLayout",{Parent=wrap,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,5)})
-				local hrow=N("Frame",{Parent=wrap,Size=UDim2.new(1,0,0,22),BackgroundTransparency=1})
-				N("Frame",{Parent=hrow,Position=UDim2.new(0,8,0.5,0),Size=UDim2.new(1,-8,0,1),BackgroundColor3=ZNX.Theme.Line,BorderSizePixel=0})
-				local slbl=N("TextLabel",{Parent=hrow,Position=UDim2.new(0,12,0,0),Size=UDim2.new(1,-12,1,0),BackgroundTransparency=1,Text=sCfg.Name:upper(),Font=Enum.Font.GothamBold,TextSize=10,TextColor3=ZNX.Theme.TxB,TextXAlignment=Enum.TextXAlignment.Left}); B(slbl,"TextColor3","TxB")
-				local holder=N("Frame",{Parent=wrap,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1})
-				N("UIListLayout",{Parent=holder,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,5)})
-				local SE={}; for k2,v2 in pairs(BuildElem(holder,sCfg.Name)) do SE[k2]=v2 end; return SE
-			end
-
-			function E:AddImageDropdown(imgCfg)
-				imgCfg=imgCfg or{}; imgCfg.Name=imgCfg.Name or "Imagens"; imgCfg.OnApply=imgCfg.OnApply or function(_)end; imgCfg.SaveKey=imgCfg.SaveKey or "__ZNX5Bg"
-				local saved={}
-				local function LdImg() if not readfile or not isfile or not isfolder then return end; local p=ZNX.SaveDir.."/"..imgCfg.SaveKey..".json"; if not isfile(p) then return end; local ok,d=pcall(function() return HTTP:JSONDecode(readfile(p)) end); if ok and type(d)=="table" then saved=d end end
-				local function SvImg() if not writefile or not isfolder then return end; if not isfolder(ZNX.SaveDir) then makefolder(ZNX.SaveDir) end; pcall(writefile,ZNX.SaveDir.."/"..imgCfg.SaveKey..".json",HTTP:JSONEncode(saved)) end
-				LdImg()
-				local outer=N("Frame",{Parent=par,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundColor3=ZNX.Theme.Bg2,BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,3)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1}),N("UIPadding",{PaddingLeft=UDim.new(0,12),PaddingRight=UDim.new(0,12),PaddingTop=UDim.new(0,10),PaddingBottom=UDim.new(0,10)})})
-				B(outer,"BackgroundColor3","Bg2")
-				N("UIListLayout",{Parent=outer,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,8)})
-				local tlbl=N("TextLabel",{Parent=outer,Size=UDim2.new(1,0,0,16),BackgroundTransparency=1,Text=imgCfg.Name:upper(),Font=Enum.Font.GothamBold,TextSize=9,TextColor3=ZNX.Theme.TxB,TextXAlignment=Enum.TextXAlignment.Left}); B(tlbl,"TextColor3","TxB")
-				local inRow=N("Frame",{Parent=outer,Size=UDim2.new(1,0,0,34),BackgroundTransparency=1})
-				local function MkIn(x,w,ph)
-					local f=N("Frame",{Parent=inRow,Position=UDim2.new(x,0,0,0),Size=UDim2.new(w,-2,1,0),BackgroundColor3=ZNX.Theme.BgI,BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,2)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1})}); B(f,"BackgroundColor3","BgI")
-					local tb3=N("TextBox",{Parent=f,Position=UDim2.new(0,8,0,0),Size=UDim2.new(1,-16,1,0),BackgroundTransparency=1,Text="",PlaceholderText=ph,PlaceholderColor3=ZNX.Theme.TxC,Font=Enum.Font.Gotham,TextSize=11,TextColor3=ZNX.Theme.TxA,ClearTextOnFocus=false,TextXAlignment=Enum.TextXAlignment.Left}); B(tb3,"TextColor3","TxA")
-					C(tb3.Focused,function() Tw(f:FindFirstChildOfClass("UIStroke"),TI.Fast,{Color=ZNX.Theme.A}) end); C(tb3.FocusLost,function() Tw(f:FindFirstChildOfClass("UIStroke"),TI.Fast,{Color=ZNX.Theme.Line}) end)
-					return tb3
-				end
-				local nameIn=MkIn(0,.38,"Nome"); local idIn=MkIn(.39,.39,"ID Roblox")
-				local addBtn=N("TextButton",{Parent=inRow,Position=UDim2.new(.79,4,0,0),Size=UDim2.new(.21,-4,1,0),BackgroundColor3=ZNX.Theme.A,BorderSizePixel=0,Text="ADD",Font=Enum.Font.Gotham,TextSize=11,TextColor3=Color3.fromRGB(255,255,255),AutoButtonColor=false},{N("UICorner",{CornerRadius=UDim.new(0,2)})}); B(addBtn,"BackgroundColor3","A")
-				C(addBtn.MouseEnter,function() Tw(addBtn,TI.Fast,{BackgroundColor3=ZNX.Theme.ABr}) end); C(addBtn.MouseLeave,function() Tw(addBtn,TI.Fast,{BackgroundColor3=ZNX.Theme.A}) end)
-				N("Frame",{Parent=outer,Size=UDim2.new(1,0,0,1),BackgroundColor3=ZNX.Theme.Line,BorderSizePixel=0})
-				local listF=N("Frame",{Parent=outer,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1})
-				N("UIListLayout",{Parent=listF,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,5)})
-				local function ReBuild()
-					for _,ch in ipairs(listF:GetChildren()) do if not ch:IsA("UIListLayout") then ch:Destroy() end end
-					if #saved==0 then local em=N("TextLabel",{Parent=listF,Size=UDim2.new(1,0,0,24),BackgroundTransparency=1,Text="Nenhuma imagem salva ainda.",Font=Enum.Font.Gotham,TextSize=11,TextColor3=ZNX.Theme.TxC,TextXAlignment=Enum.TextXAlignment.Center}); B(em,"TextColor3","TxC"); return end
-					for idx3,img in ipairs(saved) do
-						local row2=N("Frame",{Parent=listF,Size=UDim2.new(1,0,0,60),BackgroundColor3=ZNX.Theme.Bg3,BorderSizePixel=0},{N("UICorner",{CornerRadius=UDim.new(0,3)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1}),N("UIPadding",{PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8),PaddingTop=UDim.new(0,8),PaddingBottom=UDim.new(0,8)})}); B(row2,"BackgroundColor3","Bg3")
-						N("ImageLabel",{Parent=row2,Size=UDim2.new(0,44,0,44),BackgroundColor3=ZNX.Theme.BgI,BorderSizePixel=0,Image="rbxassetid://"..tostring(img.id),ScaleType=Enum.ScaleType.Crop},{N("UICorner",{CornerRadius=UDim.new(0,3)}),N("UIStroke",{Color=ZNX.Theme.Line,Thickness=1})})
-						local nl4=N("TextLabel",{Parent=row2,Position=UDim2.new(0,52,0,2),Size=UDim2.new(1,-120,0,18),BackgroundTransparency=1,Text=img.name,Font=Enum.Font.GothamSemibold,TextSize=12,TextColor3=ZNX.Theme.TxA,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd}); B(nl4,"TextColor3","TxA")
-						N("TextLabel",{Parent=row2,Position=UDim2.new(0,52,0,22),Size=UDim2.new(1,-120,0,12),BackgroundTransparency=1,Text="ID: "..tostring(img.id),Font=Enum.Font.Gotham,TextSize=9,TextColor3=ZNX.Theme.TxC,TextXAlignment=Enum.TextXAlignment.Left})
-						local apB=N("TextButton",{Parent=row2,Position=UDim2.new(1,-96,0.5,-13),Size=UDim2.new(0,48,0,26),BackgroundColor3=ZNX.Theme.A,BorderSizePixel=0,Text="Aplicar",Font=Enum.Font.Gotham,TextSize=10,TextColor3=Color3.fromRGB(255,255,255),AutoButtonColor=false},{N("UICorner",{CornerRadius=UDim.new(0,2)})}); B(apB,"BackgroundColor3","A")
-						C(apB.MouseEnter,function() Tw(apB,TI.Fast,{BackgroundColor3=ZNX.Theme.ABr}) end); C(apB.MouseLeave,function() Tw(apB,TI.Fast,{BackgroundColor3=ZNX.Theme.A}) end)
-						C(apB.MouseButton1Up,function() imgCfg.OnApply(tostring(img.id)); ZNX:Notify({Title="Imagem Aplicada",Message=img.name,Duration=3,Type="ok"}) end)
-						local capIdx=idx3
-						local delB=N("TextButton",{Parent=row2,Position=UDim2.new(1,-44,0.5,-13),Size=UDim2.new(0,40,0,26),BackgroundColor3=Color3.fromRGB(60,20,20),BorderSizePixel=0,Text="X",Font=Enum.Font.GothamBold,TextSize=10,TextColor3=Color3.fromRGB(240,80,80),AutoButtonColor=false},{N("UICorner",{CornerRadius=UDim.new(0,2)})})
-						C(delB.MouseEnter,function() Tw(delB,TI.Fast,{BackgroundColor3=Color3.fromRGB(90,30,30)}) end); C(delB.MouseLeave,function() Tw(delB,TI.Fast,{BackgroundColor3=Color3.fromRGB(60,20,20)}) end)
-						C(delB.MouseButton1Up,function() local n2=saved[capIdx] and saved[capIdx].name or "?"; table.remove(saved,capIdx); SvImg(); ReBuild(); ZNX:Notify({Title="Removida",Message=n2,Duration=2,Type="err"}) end)
-					end
-				end
-				ReBuild()
-				C(addBtn.MouseButton1Up,function()
-					local nome=nameIn.Text:match("^%s*(.-)%s*$"); local id2=idIn.Text:match("^%s*(.-)%s*$")
-					if nome=="" or id2=="" then ZNX:Notify({Title="Campos Vazios",Message="Preencha nome e ID.",Duration=3,Type="warn"}); return end
-					for _,img in ipairs(saved) do if tostring(img.id)==id2 then ZNX:Notify({Title="Duplicado",Message="ID ja salvo: "..img.name,Duration=3,Type="warn"}); return end end
-					table.insert(saved,{name=nome,id=id2}); SvImg(); nameIn.Text=""; idIn.Text=""; ReBuild(); ZNX:Notify({Title="Salva",Message=nome.." · "..id2,Duration=3,Type="ok"}) end)
-				reg(outer,imgCfg.Name); return{Rebuild=ReBuild}
-			end
-
-			return E
-		end
-
-		local EF={}; for k2,v2 in pairs(BuildElem(CS,"")) do EF[k2]=v2 end; return EF
-	end
-
-	-- ABA SETTINGS (compacta)
-	local function BuildSettings()
-		local ST = TabFn:MakeTab({Name = "Settings"})
-
-		local App = ST:AddSection({Name = "Aparência"})
-		App:AddColorpicker({Name = "Fundo janela", Default = ZNX.Theme.Bg0, ThemeKey = "Bg0", Callback = function(c) ZNX:SetColor("Bg0", c) end})
-		App:AddColorpicker({Name = "Sidebar", Default = ZNX.Theme.Bg1, ThemeKey = "Bg1", Callback = function(c) ZNX:SetColor("Bg1", c) end})
-		App:AddColorpicker({Name = "Cards", Default = ZNX.Theme.Bg2, ThemeKey = "Bg2", Callback = function(c) ZNX:SetColor("Bg2", c); ZNX:SetColor("Bg3", Color3.fromRGB(Cl(c.R*255+8,0,255), Cl(c.G*255+8,0,255), Cl(c.B*255+8,0,255))) end})
-		App:AddSlider({Name = "Opacidade fundo", Min = 0, Max = 100, Increment = 5, Default = math.floor((1 - wCfg.BgImageAlpha) * 100), Suffix = "%", Callback = function(v)
-			local t = 1 - (v / 100)
-			BgImg.ImageTransparency = t
-			BgDim.BackgroundTransparency = wCfg.BgImage~="" and 0.5 or 1
-		end})
-
-		local Acc = ST:AddSection({Name = "Accent"})
-		Acc:AddColorpicker({Name = "Cor principal", Default = ZNX.Theme.A, ThemeKey = "A", Callback = function(c)
-			ZNX:SetColor("A", c)
-			ZNX:SetColor("ADim", Color3.fromRGB(math.floor(c.R*255*0.7), math.floor(c.G*255*0.7), math.floor(c.B*255*0.7)))
-			ZNX:SetColor("ABr", Color3.fromRGB(Cl(c.R*255+30,0,255), Cl(c.G*255+30,0,255), Cl(c.B*255+30,0,255)))
-		end})
-		Acc:AddColorpicker({Name = "Accent 2", Default = ZNX.Theme.A2, ThemeKey = "A2", Callback = function(c) ZNX:SetColor("A2", c) end})
-
-		local BT = ST:AddSection({Name = "Texto"})
-		BT:AddColorpicker({Name = "Texto principal", Default = ZNX.Theme.TxA, ThemeKey = "TxA", Callback = function(c) ZNX:SetColor("TxA", c) end})
-		BT:AddColorpicker({Name = "Texto secundário", Default = ZNX.Theme.TxB, ThemeKey = "TxB", Callback = function(c) ZNX:SetColor("TxB", c) end})
-		BT:AddColorpicker({Name = "Bordas", Default = ZNX.Theme.Line, ThemeKey = "Line", Callback = function(c) ZNX:SetColor("Line", c) end})
-
-		local Security = ST:AddSection({Name = "Segurança"})
-		Security:AddToggle({Name = "Packet Detector", Default = false, Save = true, Flag = "PacketDetector", Callback = function(v) if v then PacketDetector:start() else PacketDetector:stop() end end})
-		
-		local Adv = ST:AddSection({Name = "Avançado"})
-		local kbSlider = Adv:AddSlider({Name = "Limite KB", Min = 1, Max = 50, Increment = 1, Default = 5, Suffix = "KB", Save = true, Flag = "PacketKBLimit", Callback = function(v) PacketDetector.KB_THRESHOLD = v; PacketDetector.BYTE_THRESHOLD = v * 1024 end})
-		kbSlider:Set(PacketDetector.KB_THRESHOLD)
-		Adv:AddButton({Name = "Testar Detector", Callback = function() PacketDetector:showNotification(LP, 0.01, {"Teste"}, "TestMode") end})
-
-		local PS = ST:AddSection({Name = "Presets"})
-		PS:AddButton({Name = "Obsidian", Callback = function()
-			for k,v in pairs(DT) do ZNX.Theme[k]=v end
-			ApplyTheme()
-			ZNX:Notify({Title="Preset", Message="Obsidian aplicado", Duration=2})
-		end})
-		PS:AddButton({Name = "Crimson", Callback = function()
-			ZNX:Theme.A = Color3.fromRGB(200,30,50)
-			ApplyTheme()
-		end})
-		PS:AddButton({Name = "Cyan", Callback = function()
-			ZNX:Theme.A = Color3.fromRGB(0,180,200)
-			ApplyTheme()
-		end})
-
-		local Cfg = ST:AddSection({Name = "Configuração"})
-		Cfg:AddButton({Name = "Salvar", Callback = function() sDb=0; SaveCfg(wCfg.ConfigName); ZNX:Notify({Title="Salvo", Duration=2}) end})
-		Cfg:AddButton({Name = "Resetar tema", Callback = function() for k2,v2 in pairs(DT) do ZNX.Theme[k2]=v2 end; ApplyTheme() end})
-		Cfg:AddDropdown({Name = "Notificações", Options = {"BottomRight","BottomLeft","TopRight","TopLeft"}, Default = ZNX.NPos, Callback = function(v) ZNX:SetNotifyPosition(v); SaveCfg(wCfg.ConfigName) end})
-		Cfg:AddTextbox({Name = "ID imagem", Default = wCfg.BgImage, Placeholder = "ID", Callback = function(id) wCfg.BgImage=id; BgImg.Image=id~="" and "rbxassetid://"..id or ""; BgDim.BackgroundTransparency=id~="" and 0.5 or 1 end})
-		Cfg:AddBind({Name = "Tecla toggle", Default = Enum.KeyCode[wCfg.ToggleKey] or Enum.KeyCode.M, Callback = function() end})
-
-		local Info = ST:AddSection({Name = "Sessão"})
-		Info:AddLabel("👤 " .. LP.DisplayName .. " (@" .. LP.Name .. ")")
-		Info:AddLabel("🆔 " .. LP.UserId)
-		Info:AddLabel("🔧 ZNXHUB v5.2")
-	end
-
-	BuildSettings()
-	if wCfg.SaveConfig then task.defer(function() LoadCfg(wCfg.ConfigName) end) end
-	return TabFn
-end
-
+function ZNX:MakeWindow() end
 function ZNX:Init() end
 return ZNX
