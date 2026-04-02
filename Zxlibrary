@@ -25,33 +25,99 @@ local function clamp(val, low, high)
     return math.max(low, math.min(high, val))
 end
 
-local Theme = {
-    Window = Color3.fromRGB(12, 10, 28),
-    Panel = Color3.fromRGB(22, 18, 50),
-    Pane = Color3.fromRGB(30, 25, 72),
-    Active = Color3.fromRGB(165, 96, 255),
-    Soft = Color3.fromRGB(100, 72, 180),
-    Border = Color3.fromRGB(80, 60, 160),
-    Text = Color3.fromRGB(235, 235, 248),
-    SubText = Color3.fromRGB(160, 160, 195),
-    Warning = Color3.fromRGB(255, 160, 85),
-    Success = Color3.fromRGB(110, 215, 165),
-    Error = Color3.fromRGB(235, 90, 120),
+local Presets = {
+    Orion = {
+        Window = Color3.fromRGB(8, 8, 18),
+        Panel = Color3.fromRGB(18, 16, 40),
+        Pane = Color3.fromRGB(24, 20, 56),
+        Header = Color3.fromRGB(14, 12, 38),
+        Active = Color3.fromRGB(148, 102, 255),
+        Border = Color3.fromRGB(84, 65, 179),
+        Text = Color3.fromRGB(240, 240, 250),
+        SubText = Color3.fromRGB(145, 145, 190),
+        Accent = Color3.fromRGB(98, 70, 240),
+        Success = Color3.fromRGB(96, 215, 165),
+        Warning = Color3.fromRGB(255, 180, 90),
+        Error = Color3.fromRGB(235, 95, 120),
+        PanelTransparency = 0,
+        PaneTransparency = 0,
+    },
+    Glass = {
+        Window = Color3.fromRGB(18, 18, 38),
+        Panel = Color3.fromRGB(255, 255, 255),
+        Pane = Color3.fromRGB(28, 24, 52),
+        Header = Color3.fromRGB(22, 18, 46),
+        Active = Color3.fromRGB(175, 140, 255),
+        Border = Color3.fromRGB(255, 255, 255),
+        Text = Color3.fromRGB(245, 245, 255),
+        SubText = Color3.fromRGB(185, 185, 220),
+        Accent = Color3.fromRGB(180, 160, 255),
+        Success = Color3.fromRGB(110, 225, 175),
+        Warning = Color3.fromRGB(255, 190, 120),
+        Error = Color3.fromRGB(245, 100, 135),
+        PanelTransparency = 0.32,
+        PaneTransparency = 0.18,
+    },
 }
 
 local ZNX = {
     Theme = {},
     Watch = {},
-    Notifications = {},
+    SaveDir = "znx5_cfg",
+    ConfigFile = "theme_config.json",
+    CurrentPreset = "Orion",
     NotifPos = "BottomRight",
+    Minimized = false,
+    SaveEnabled = true,
 }
-for k, v in pairs(Theme) do ZNX.Theme[k] = v end
+
+for key, value in pairs(Presets.Orion) do
+    ZNX.Theme[key] = value
+end
+
+local function createFolder(path)
+    if isfolder and not isfolder(path) then
+        makefolder(path)
+    end
+end
+
+local function saveConfig()
+    if not writefile or not isfolder then return end
+    createFolder(ZNX.SaveDir)
+    local data = {
+        Theme = ZNX.CurrentPreset,
+        NotifPos = ZNX.NotifPos or "BottomRight",
+    }
+    pcall(function()
+        writefile(ZNX.SaveDir .. "/" .. ZNX.ConfigFile, game:GetService("HttpService"):JSONEncode(data))
+    end)
+end
+
+local function loadConfig()
+    if not readfile or not isfile then return end
+    if not isfolder(ZNX.SaveDir) then return end
+    local path = ZNX.SaveDir .. "/" .. ZNX.ConfigFile
+    if not isfile(path) then return end
+    local ok, data = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(readfile(path))
+    end)
+    if not ok or type(data) ~= "table" then return end
+    if data.Theme and Presets[data.Theme] then
+        ZNX.CurrentPreset = data.Theme
+        for key, value in pairs(Presets[data.Theme]) do
+            ZNX.Theme[key] = value
+        end
+    end
+    ZNX.NotifPos = data.NotifPos or ZNX.NotifPos
+end
+
+loadConfig()
 
 local gethui = getgenv().gethui or function() return game.CoreGui end
 local GP = (gethui and gethui()) or game:GetService("CoreGui") or LP:WaitForChild("PlayerGui")
 
 local Root = new("ScreenGui", {
-    Name = "ZNXORION",
+    Name = "ZNX_ORION",
     ResetOnSpawn = false,
     IgnoreGuiInset = true,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
@@ -64,28 +130,65 @@ for _, child in ipairs(GP:GetChildren()) do
     end
 end
 
-local function bindProperty(obj, prop, key)
+local function bindProperty(obj, prop, themeKey)
     table.insert(ZNX.Watch, function()
-        if obj and obj.Parent and ZNX.Theme[key] then
-            obj[prop] = ZNX.Theme[key]
+        if obj and obj.Parent and ZNX.Theme[themeKey] ~= nil then
+            obj[prop] = ZNX.Theme[themeKey]
         end
     end)
-    if ZNX.Theme[key] then
-        obj[prop] = ZNX.Theme[key]
+    if ZNX.Theme[themeKey] ~= nil then
+        obj[prop] = ZNX.Theme[themeKey]
     end
 end
 
-local function createNotification(message, accent)
+local function applyTheme()
+    for _, fn in ipairs(ZNX.Watch) do
+        pcall(fn)
+    end
+end
+
+local function setTheme(name)
+    if Presets[name] then
+        ZNX.CurrentPreset = name
+        for key, value in pairs(Presets[name]) do
+            ZNX.Theme[key] = value
+        end
+        applyTheme()
+        saveConfig()
+        ZNX:Notify("Tema " .. name .. " aplicado.", "success")
+    end
+end
+
+function ZNX:Notify(message, kind)
+    local accent = ZNX.Theme.Active
+    if kind == "success" then accent = ZNX.Theme.Success
+    elseif kind == "warn" then accent = ZNX.Theme.Warning
+    elseif kind == "error" then accent = ZNX.Theme.Error end
+
+    local position = UDim2.new(1, -16, 1, -16)
+    local anchor = Vector2.new(1, 1)
+    if ZNX.NotifPos == "BottomLeft" then
+        position = UDim2.new(0, 16, 1, -16)
+        anchor = Vector2.new(0, 1)
+    elseif ZNX.NotifPos == "TopRight" then
+        position = UDim2.new(1, -16, 0, 16)
+        anchor = Vector2.new(1, 0)
+    elseif ZNX.NotifPos == "TopLeft" then
+        position = UDim2.new(0, 16, 0, 16)
+        anchor = Vector2.new(0, 0)
+    end
+
     local notif = new("Frame", {
-        Size = UDim2.new(0, 320, 0, 54),
-        BackgroundColor3 = Theme.Panel,
+        Size = UDim2.new(0, 330, 0, 56),
+        Position = position,
+        AnchorPoint = anchor,
+        BackgroundColor3 = ZNX.Theme.Panel,
+        BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
         BorderSizePixel = 0,
-        AnchorPoint = Vector2.new(1, 1),
-        Position = UDim2.new(1, -16, 1, -16),
         ZIndex = 999,
     }, {
         new("UICorner", {CornerRadius = UDim.new(0, 16)}),
-        new("UIStroke", {Color = Theme.Border, Thickness = 1, Transparency = 0.7}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
         new("Frame", {
             Position = UDim2.new(0, 0, 0, 0),
             Size = UDim2.new(0, 6, 1, 0),
@@ -93,389 +196,637 @@ local function createNotification(message, accent)
             BorderSizePixel = 0,
         }, {new("UICorner", {CornerRadius = UDim.new(0, 4)})}),
         new("TextLabel", {
-            Position = UDim2.new(0, 12, 0, 12),
-            Size = UDim2.new(1, -24, 1, -24),
+            Position = UDim2.new(0, 14, 0, 12),
+            Size = UDim2.new(1, -28, 1, -24),
             BackgroundTransparency = 1,
             Text = message,
-            Font = Enum.Font.Gotham,
+            Font = Enum.Font.GothamMedium,
             TextSize = 14,
-            TextColor3 = Theme.Text,
+            TextColor3 = ZNX.Theme.Text,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextYAlignment = Enum.TextYAlignment.Top,
         }),
     })
     notif.Parent = Root
     tween(notif, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(1, -16, 1, -16)})
-    task.delay(2.8, function()
+    task.delay(2.6, function()
         tween(notif, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1})
-        task.delay(0.2, function() if notif then notif:Destroy() end end)
+        task.delay(0.22, function() if notif then notif:Destroy() end end)
     end)
-end
-
-function ZNX:Notify(message, kind)
-    local accent = Theme.Active
-    if kind == "success" then accent = Theme.Success
-    elseif kind == "warn" then accent = Theme.Warning
-    elseif kind == "error" then accent = Theme.Error end
-    createNotification(message, accent)
 end
 
 local PacketMonitor = {
     Active = true,
     Connection = nil,
-    ByteThreshold = 4 * 1024,
-    Cooldown = 20,
+    ByteThreshold = 5 * 1024,
+    Cooldown = 18,
     LastAlert = 0,
 }
 
-function PacketMonitor:Summarize(arg)
-    if typeof(arg) == "string" then
-        return #arg .. " bytes"
-    elseif typeof(arg) == "number" then
-        return tostring(arg)
-    elseif typeof(arg) == "Instance" then
-        return arg.ClassName .. ":" .. arg.Name
-    elseif typeof(arg) == "table" then
-        return "table(" .. tostring(#arg) .. ")"
+function PacketMonitor:Summarize(value)
+    if typeof(value) == "string" then
+        return string.format("string(%d)", #value)
+    elseif typeof(value) == "number" then
+        return "number"
+    elseif typeof(value) == "Instance" then
+        return value.ClassName
+    elseif typeof(value) == "table" then
+        return "table"
     else
-        return typeof(arg)
+        return typeof(value)
     end
 end
 
-function PacketMonitor:Alert(remoteName, totalBytes, args)
-    local text = "Packet suspeito detectado em " .. remoteName .. " (" .. string.format("%.1f KB", totalBytes / 1024) .. ")"
+function PacketMonitor:Alert(remoteName, total, args)
+    local message = string.format("%s detectado: %.1f KB", remoteName, total / 1024)
     for i = 1, math.min(3, #args) do
-        text = text .. "\n� " .. self:Summarize(args[i])
+        message = message .. "\n� " .. self:Summarize(args[i])
     end
-    if #args > 3 then text = text .. "\n..." end
-    ZNX:Notify(text, "warn")
+    if #args > 3 then
+        message = message .. "\n..."
+    end
+    ZNX:Notify(message, "warn")
 end
 
 function PacketMonitor:Start()
     if self.Connection then return end
-    local ok, grabEvents = pcall(function()
+    local success, grabEvents = pcall(function()
         return ReplicatedStorage:WaitForChild("GrabEvents", 5)
     end)
-    if not ok or not grabEvents then
+    if not success or not grabEvents then
         ZNX:Notify("GrabEvents n�o encontrado.", "error")
         return
     end
-    local extendGrabLine = grabEvents:FindFirstChild("ExtendGrabLine")
-    if not extendGrabLine then
+    local remote = grabEvents:FindFirstChild("ExtendGrabLine")
+    if not remote then
         ZNX:Notify("ExtendGrabLine n�o encontrado.", "error")
         return
     end
-    self.Connection = extendGrabLine.OnClientEvent:Connect(function(...)
+    self.Connection = remote.OnClientEvent:Connect(function(...)
         if not self.Active then return end
         local args = {...}
         local total = 0
-        for _, v in ipairs(args) do
-            if typeof(v) == "string" then total = total + #v
-            elseif typeof(v) == "table" then
-                for _, item in pairs(v) do
-                    if typeof(item) == "string" then total = total + #item end
+        for _, value in ipairs(args) do
+            if typeof(value) == "string" then
+                total = total + #value
+            elseif typeof(value) == "table" then
+                for _, item in pairs(value) do
+                    if typeof(item) == "string" then
+                        total = total + #item
+                    end
                 end
-            elseif typeof(v) == "Instance" then total = total + 16 end
-            elseif typeof(v) == "number" then total = total + 8 end
+            elseif typeof(value) == "Instance" then
+                total = total + 16
+            elseif typeof(value) == "number" then
+                total = total + 8
+            end
         end
         if total < self.ByteThreshold then return end
         if tick() - self.LastAlert < self.Cooldown then return end
         self.LastAlert = tick()
-        self:Alert(extendGrabLine.Name, total, args)
+        self:Alert(remote.Name, total, args)
     end)
-    ZNX:Notify("Packet monitor ativado.", "success")
+    ZNX:Notify("Packet Shield ativado.", "success")
 end
 
 function PacketMonitor:Stop()
-    ZNX:Notify("Monitoramento permanece ativo.", "warn")
+    ZNX:Notify("Packet Shield permanece ativo.", "warn")
+end
+
+local function makeButton(icon, tooltip)
+    local btn = new("TextButton", {
+        Size = UDim2.new(0, 34, 0, 34),
+        BackgroundColor3 = ZNX.Theme.Panel,
+        BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Text = "",
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 18)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+        new("ImageLabel", {
+            Size = UDim2.new(0, 18, 0, 18),
+            Position = UDim2.new(0.5, -9, 0.5, -9),
+            BackgroundTransparency = 1,
+            Image = icon,
+            ImageColor3 = ZNX.Theme.SubText,
+        }),
+    })
+    bindProperty(btn, "BackgroundColor3", "Panel")
+    bindProperty(btn, "BackgroundTransparency", "PanelTransparency")
+    bindProperty(btn:FindFirstChildOfClass("ImageLabel"), "ImageColor3", "SubText")
+    return btn
 end
 
 local Window = new("Frame", {
-    Name = "Window",
+    Name = "ZNXWindow",
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.new(0.5, 0, 0.5, 0),
-    Size = UDim2.new(0, 920, 0, 560),
-    BackgroundColor3 = Theme.Window,
+    Size = UDim2.new(0, 900, 0, 540),
+    BackgroundColor3 = ZNX.Theme.Window,
     BorderSizePixel = 0,
     ClipsDescendants = true,
 }, {
     new("UICorner", {CornerRadius = UDim.new(0, 26)}),
-    new("UIStroke", {Color = Theme.Border, Thickness = 1, Transparency = 0.7}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
 })
 Window.Parent = Root
 
-local Nav = new("Frame", {
-    Name = "Nav",
-    Position = UDim2.new(0, 24, 0, 24),
-    Size = UDim2.new(0, 220, 1, -48),
-    BackgroundColor3 = Theme.Panel,
+bindProperty(Window, "BackgroundColor3", "Window")
+
+local LeftPanel = new("Frame", {
+    Name = "LeftPanel",
+    Position = UDim2.new(0, 18, 0, 18),
+    Size = UDim2.new(0, 228, 1, -36),
+    BackgroundColor3 = ZNX.Theme.Panel,
+    BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
+    BorderSizePixel = 0,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(0, 22)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+})
+LeftPanel.Parent = Window
+bindProperty(LeftPanel, "BackgroundColor3", "Panel")
+bindProperty(LeftPanel, "BackgroundTransparency", "PanelTransparency")
+
+local TitleArea = new("Frame", {
+    Name = "TitleArea",
+    Size = UDim2.new(1, 0, 0, 76),
+    BackgroundTransparency = 1,
+}, {
+    new("TextLabel", {
+        Name = "Logo",
+        Position = UDim2.new(0, 18, 0, 18),
+        Size = UDim2.new(1, -36, 0, 26),
+        BackgroundTransparency = 1,
+        Text = "FMG Hub",
+        Font = Enum.Font.GothamBlack,
+        TextSize = 20,
+        TextColor3 = ZNX.Theme.Text,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }),
+})
+TitleArea.Parent = LeftPanel
+bindProperty(TitleArea.Logo, "TextColor3", "Text")
+
+local SearchBox = new("TextBox", {
+    Name = "SearchBox",
+    Position = UDim2.new(0, 18, 0, 106),
+    Size = UDim2.new(1, -36, 0, 38),
+    BackgroundColor3 = ZNX.Theme.Pane,
+    BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
+    BorderSizePixel = 0,
+    Text = "",
+    PlaceholderText = "Search",
+    PlaceholderColor3 = ZNX.Theme.SubText,
+    TextColor3 = ZNX.Theme.Text,
+    Font = Enum.Font.GothamMedium,
+    TextSize = 14,
+    ClearTextOnFocus = false,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(0, 18)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+})
+SearchBox.Parent = LeftPanel
+bindProperty(SearchBox, "BackgroundColor3", "Pane")
+bindProperty(SearchBox, "BackgroundTransparency", "PaneTransparency")
+bindProperty(SearchBox, "TextColor3", "Text")
+bindProperty(SearchBox, "PlaceholderColor3", "SubText")
+
+local TabScroll = new("ScrollingFrame", {
+    Name = "TabScroll",
+    Position = UDim2.new(0, 0, 0, 160),
+    Size = UDim2.new(1, 0, 1, -220),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 6,
+    ScrollBarImageColor3 = ZNX.Theme.Active,
+}, {
+    new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)}),
+    new("UIPadding", {PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12)}),
+})
+TabScroll.Parent = LeftPanel
+bindProperty(TabScroll, "ScrollBarImageColor3", "Active")
+
+local BottomCard = new("Frame", {
+    Name = "BottomCard",
+    Position = UDim2.new(0, 18, 1, -84),
+    Size = UDim2.new(1, -36, 0, 66),
+    BackgroundColor3 = ZNX.Theme.Pane,
+    BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
+    BorderSizePixel = 0,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(0, 18)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+})
+BottomCard.Parent = LeftPanel
+bindProperty(BottomCard, "BackgroundColor3", "Pane")
+bindProperty(BottomCard, "BackgroundTransparency", "PaneTransparency")
+
+new("ImageLabel", {
+    Parent = BottomCard,
+    Position = UDim2.new(0, 10, 0.5, -20),
+    Size = UDim2.new(0, 40, 0, 40),
+    BackgroundTransparency = 1,
+    Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LP.UserId .. "&width=420&height=420&format=png",
+    ScaleType = Enum.ScaleType.Fit,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(1, 0)}),
+    new("UIStroke", {Color = ZNX.Theme.Active, Thickness = 2, Transparency = 0.8}),
+})
+
+new("TextLabel", {
+    Parent = BottomCard,
+    Position = UDim2.new(0, 62, 0, 14),
+    Size = UDim2.new(1, -74, 0, 18),
+    BackgroundTransparency = 1,
+    Text = LP.DisplayName,
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+    TextColor3 = ZNX.Theme.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+
+new("TextLabel", {
+    Parent = BottomCard,
+    Position = UDim2.new(0, 62, 0, 34),
+    Size = UDim2.new(1, -74, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "@" .. LP.Name,
+    Font = Enum.Font.Gotham,
+    TextSize = 12,
+    TextColor3 = ZNX.Theme.SubText,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+
+local TopBar = new("Frame", {
+    Name = "TopBar",
+    Position = UDim2.new(0, 264, 0, 18),
+    Size = UDim2.new(1, -282, 0, 66),
+    BackgroundColor3 = ZNX.Theme.Pane,
+    BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
+    BorderSizePixel = 0,
+}, {
+    new("UICorner", {CornerRadius = UDim.new(0, 18)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    new("UIGradient", {Color = ColorSequence.new{ColorSequenceKeypoint.new(0, ZNX.Theme.Pane), ColorSequenceKeypoint.new(1, ZNX.Theme.Panel)}}),
+})
+TopBar.Parent = Window
+bindProperty(TopBar, "BackgroundColor3", "Pane")
+bindProperty(TopBar, "BackgroundTransparency", "PaneTransparency")
+
+local ContentFrame = new("Frame", {
+    Name = "ContentFrame",
+    Position = UDim2.new(0, 264, 0, 88),
+    Size = UDim2.new(1, -282, 1, -106),
+    BackgroundColor3 = ZNX.Theme.Pane,
+    BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
     BorderSizePixel = 0,
 }, {
     new("UICorner", {CornerRadius = UDim.new(0, 24)}),
-    new("UIStroke", {Color = Theme.Border, Thickness = 1, Transparency = 0.6}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
 })
-Nav.Parent = Window
+ContentFrame.Parent = Window
+bindProperty(ContentFrame, "BackgroundColor3", "Pane")
+bindProperty(ContentFrame, "BackgroundTransparency", "PaneTransparency")
 
-local Content = new("Frame", {
-    Name = "Content",
-    Position = UDim2.new(0, 268, 0, 24),
-    Size = UDim2.new(1, -292, 1, -48),
-    BackgroundColor3 = Theme.Pane,
-    BorderSizePixel = 0,
-}, {
-    new("UICorner", {CornerRadius = UDim.new(0, 24)}),
-    new("UIStroke", {Color = Theme.Border, Thickness = 1, Transparency = 0.6}),
-})
-Content.Parent = Window
-
-local Header = new("Frame", {
-    Name = "Header",
-    Size = UDim2.new(1, 0, 0, 82),
+local HeaderBar = new("Frame", {
+    Name = "HeaderBar",
+    Size = UDim2.new(1, 0, 1, 0),
     BackgroundTransparency = 1,
 }, {
-    new("UIGradient", {Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Theme.Pane), ColorSequenceKeypoint.new(1, Theme.Panel)}}),
+    new("UIGradient", {Color = ColorSequence.new{ColorSequenceKeypoint.new(0, ZNX.Theme.Pane), ColorSequenceKeypoint.new(1, ZNX.Theme.Panel)}}),
 })
-Header.Parent = Content
+HeaderBar.Parent = TopBar
 
-local TitleText = new("TextLabel", {
-    Name = "TitleText",
-    Position = UDim2.new(0, 24, 0, 18),
-    Size = UDim2.new(1, -48, 0, 28),
+local MainTitle = new("TextLabel", {
+    Parent = HeaderBar,
+    Position = UDim2.new(0, 24, 0, 12),
+    Size = UDim2.new(0.6, 0, 0, 28),
     BackgroundTransparency = 1,
-    Text = "Zephyr | Orion Redesign",
+    Text = "FMG Hub",
     Font = Enum.Font.GothamBlack,
     TextSize = 22,
-    TextColor3 = Theme.Text,
+    TextColor3 = ZNX.Theme.Text,
     TextXAlignment = Enum.TextXAlignment.Left,
 })
-TitleText.Parent = Header
 
-local Subtitle = new("TextLabel", {
-    Name = "Subtitle",
-    Position = UDim2.new(0, 24, 0, 46),
-    Size = UDim2.new(1, -48, 0, 20),
+local InfoText = new("TextLabel", {
+    Parent = HeaderBar,
+    Position = UDim2.new(0, 24, 0, 40),
+    Size = UDim2.new(0.6, 0, 0, 18),
     BackgroundTransparency = 1,
-    Text = "Interface repaginada, funcionalidades mantidas.",
-    Font = Enum.Font.GothamMedium,
+    Text = "Orion style refresh",
+    Font = Enum.Font.Gotham,
     TextSize = 13,
-    TextColor3 = Theme.SubText,
+    TextColor3 = ZNX.Theme.SubText,
     TextXAlignment = Enum.TextXAlignment.Left,
 })
-Subtitle.Parent = Header
 
 local StatusBar = new("Frame", {
-    Name = "StatusBar",
-    Position = UDim2.new(0, 24, 0, 96),
-    Size = UDim2.new(1, -48, 0, 36),
-    BackgroundColor3 = Theme.Panel,
+    Parent = HeaderBar,
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -24, 0, 14),
+    Size = UDim2.new(0, 270, 0, 34),
+    BackgroundColor3 = ZNX.Theme.Panel,
+    BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
     BorderSizePixel = 0,
 }, {
-    new("UICorner", {CornerRadius = UDim.new(0, 14)}),
-    new("UIStroke", {Color = Theme.Border, Thickness = 1, Transparency = 0.7}),
+    new("UICorner", {CornerRadius = UDim.new(0, 16)}),
+    new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
 })
-StatusBar.Parent = Content
 
-local StatusText = new("TextLabel", {
-    Name = "StatusText",
-    Position = UDim2.new(0, 16, 0, 8),
-    Size = UDim2.new(0.5, 0, 0, 20),
+local StatusLabel = new("TextLabel", {
+    Parent = StatusBar,
+    Size = UDim2.new(1, -24, 1, 0),
+    Position = UDim2.new(0, 18, 0, 0),
     BackgroundTransparency = 1,
     Text = "-- fps  |  --ms  |  --:--",
     Font = Enum.Font.GothamMedium,
     TextSize = 13,
-    TextColor3 = Theme.SubText,
+    TextColor3 = ZNX.Theme.SubText,
     TextXAlignment = Enum.TextXAlignment.Left,
 })
-StatusText.Parent = StatusBar
 
-local MonitorStatus = new("TextLabel", {
-    Name = "MonitorStatus",
+local ShieldLabel = new("TextLabel", {
+    Parent = StatusBar,
     AnchorPoint = Vector2.new(1, 0),
-    Position = UDim2.new(1, -16, 0, 8),
-    Size = UDim2.new(0.5, 0, 0, 20),
+    Position = UDim2.new(1, -18, 0, 0),
+    Size = UDim2.new(0.5, 0, 1, 0),
     BackgroundTransparency = 1,
     Text = "Packet Shield: ATIVO",
     Font = Enum.Font.GothamBold,
     TextSize = 13,
-    TextColor3 = Theme.Success,
+    TextColor3 = ZNX.Theme.Success,
     TextXAlignment = Enum.TextXAlignment.Right,
 })
-MonitorStatus.Parent = StatusBar
+
+bindProperty(MainTitle, "TextColor3", "Text")
+bindProperty(InfoText, "TextColor3", "SubText")
+bindProperty(StatusLabel, "TextColor3", "SubText")
+bindProperty(ShieldLabel, "TextColor3", "Success")
+bindProperty(StatusBar, "BackgroundColor3", "Panel")
+bindProperty(StatusBar, "BackgroundTransparency", "PanelTransparency")
 
 local PageContainer = new("Frame", {
-    Name = "PageContainer",
-    Position = UDim2.new(0, 24, 0, 146),
-    Size = UDim2.new(1, -48, 1, -170),
+    Parent = ContentFrame,
+    Position = UDim2.new(0, 0, 0, 76),
+    Size = UDim2.new(1, 0, 1, -76),
     BackgroundTransparency = 1,
 })
-PageContainer.Parent = Content
 
-local function createCard(title, subtitle)
-    local frame = new("Frame", {
-        Size = UDim2.new(1, 0, 0, 92),
-        BackgroundColor3 = Theme.Panel,
+local pageList = {}
+local activePage = nil
+
+local function createPage(name)
+    local page = new("Frame", {
+        Name = name .. "Page",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Visible = false,
+    }, {
+        new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 16)}),
+        new("UIPadding", {PaddingLeft = UDim.new(0, 24), PaddingRight = UDim.new(0, 24), PaddingTop = UDim.new(0, 18), PaddingBottom = UDim.new(0, 18)}),
+    })
+    page.Parent = PageContainer
+    return page
+end
+
+local function createNavEntry(text)
+    local entry = new("TextButton", {
+        Size = UDim2.new(1, 0, 0, 48),
+        BackgroundColor3 = ZNX.Theme.Pane,
+        BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
         BorderSizePixel = 0,
+        Text = text,
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 14,
+        TextColor3 = ZNX.Theme.Text,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        AutoButtonColor = false,
     }, {
         new("UICorner", {CornerRadius = UDim.new(0, 18)}),
-        new("UIStroke", {Color = Theme.Border, Thickness = 1, Transparency = 0.75}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
     })
-    new("TextLabel", {
-        Name = "CardTitle",
+    entry.Parent = TabScroll
+    bindProperty(entry, "BackgroundColor3", "Pane")
+    bindProperty(entry, "BackgroundTransparency", "PaneTransparency")
+    bindProperty(entry:FindFirstChildOfClass("TextLabel") or entry, "TextColor3", "Text")
+    return entry
+end
+
+local function createCard(title, subtitle)
+    local card = new("Frame", {
+        Size = UDim2.new(1, 0, 0, 90),
+        BackgroundColor3 = ZNX.Theme.Panel,
+        BackgroundTransparency = ZNX.Theme.PanelTransparency or 0,
+        BorderSizePixel = 0,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 20)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    })
+    local titleLabel = new("TextLabel", {
+        Parent = card,
         Position = UDim2.new(0, 20, 0, 18),
         Size = UDim2.new(1, -40, 0, 24),
         BackgroundTransparency = 1,
         Text = title,
         Font = Enum.Font.GothamBold,
-        TextSize = 16,
-        TextColor3 = Theme.Text,
+        TextSize = 15,
+        TextColor3 = ZNX.Theme.Text,
         TextXAlignment = Enum.TextXAlignment.Left,
-    }).Parent = frame
-    new("TextLabel", {
-        Name = "CardDesc",
+    })
+    local descLabel = new("TextLabel", {
+        Parent = card,
         Position = UDim2.new(0, 20, 0, 44),
-        Size = UDim2.new(1, -40, 0, 36),
+        Size = UDim2.new(1, -40, 0, 34),
         BackgroundTransparency = 1,
         Text = subtitle,
         Font = Enum.Font.GothamMedium,
         TextSize = 13,
-        TextColor3 = Theme.SubText,
+        TextColor3 = ZNX.Theme.SubText,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextWrapped = true,
-    }).Parent = frame
-    return frame
+    })
+    bindProperty(card, "BackgroundColor3", "Panel")
+    bindProperty(card, "BackgroundTransparency", "PanelTransparency")
+    bindProperty(titleLabel, "TextColor3", "Text")
+    bindProperty(descLabel, "TextColor3", "SubText")
+    return card
 end
 
-local tabs = {}
-local currentPage
-
-local function switchTab(name)
-    for tabName, tabData in pairs(tabs) do
-        tabData.Button.BackgroundColor3 = tabName == name and Theme.Active or Theme.Panel
-        tabData.Button.TextColor3 = tabName == name and Theme.Text or Theme.SubText
-        tabData.Page.Visible = tabName == name
+local function setActivePage(name)
+    for pageName, pageData in pairs(pageList) do
+        pageData.Page.Visible = pageName == name
+        pageData.Button.BackgroundColor3 = pageName == name and ZNX.Theme.Active or ZNX.Theme.Pane
+        pageData.Button.BackgroundTransparency = pageName == name and 0 or (ZNX.Theme.PaneTransparency or 0)
+        pageData.Button.TextColor3 = pageName == name and ZNX.Theme.Text or ZNX.Theme.SubText
     end
-    currentPage = name
+    activePage = name
 end
 
-local function addTab(name, builder)
-    local button = new("TextButton", {
-        Name = name:gsub("%s+", ""),
-        BackgroundColor3 = Theme.Panel,
-        BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, 46),
-        Text = name,
-        Font = Enum.Font.GothamSemibold,
-        TextSize = 14,
-        TextColor3 = Theme.SubText,
-        AutoButtonColor = false,
-    }, {
-        new("UICorner", {CornerRadius = UDim.new(0, 16)}),
-    })
-    button.Parent = Nav
-    local page = new("Frame", {
-        Name = name .. "Page",
-        Size = UDim2.new(1, 1, 1, 0),
-        BackgroundTransparency = 1,
-        Visible = false,
-    }, {
-        new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 14)}),
-        new("UIPadding", {PaddingTop = UDim.new(0, 16), PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16), PaddingBottom = UDim.new(0, 16)}),
-    })
-    page.Parent = PageContainer
-    tabs[name] = {Button = button, Page = page}
+local function addPage(name)
+    local button = createNavEntry(name)
+    local page = createPage(name)
+    pageList[name] = {Button = button, Page = page}
     button.MouseButton1Click:Connect(function()
-        switchTab(name)
+        setActivePage(name)
     end)
-    builder(page)
-    if not currentPage then
-        switchTab(name)
-    end
+    return page
 end
 
-local function createNavButton(parent, text)
+local dashboardPage = addPage("Dashboard")
+createCard("Delete member", "Remova jogadores do menu de forma r�pida e segura."):Parent(dashboardPage)
+createCard("TeleportWalk", "Movimenta��o r�pida com controle de velocidade."):Parent(dashboardPage)
+createCard("InfiniteJump", "Ative pulo infinito com op��es de toggle."):Parent(dashboardPage)
+
+local playerPage = addPage("Player")
+createCard("Speed", "Ajuste a velocidade do personagem."):Parent(playerPage)
+createCard("JumpPower", "Configure o salto para escapar mais r�pido."):Parent(playerPage)
+
+local defensePage = addPage("Invulnerability")
+createCard("Shield", "Modo invulner�vel para ficar seguro."):Parent(defensePage)
+createCard("Aura", "Efeito visual e defesa extra."):Parent(defensePage)
+
+local grabPage = addPage("Grab")
+createCard("Grab Monitor", "Monitoramento autom�tico de pacotes de grab."):Parent(grabPage)
+
+local bindsPage = addPage("Keybinds")
+createCard("Toggle Key", "Atalho para abrir/fechar o menu."):Parent(bindsPage)
+
+local loopsPage = addPage("Loops")
+createCard("Auto Loop", "Execu��o cont�nua de rotinas."):Parent(loopsPage)
+
+local settingsPage = addPage("Settings")
+createCard("Tema", "Escolha Orion ou Glass."):Parent(settingsPage)
+createCard("Notifica��es", "Posi��o e estilo de notifica��o."):Parent(settingsPage)
+
+setActivePage("Dashboard")
+
+local closeButton = makeButton("rbxassetid://7072725342", "Close")
+closeButton.Parent = HeaderBar
+closeButton.Position = UDim2.new(1, -18, 0, 16)
+closeButton.ZIndex = 10
+closeButton.MouseButton1Click:Connect(function()
+    Root.Enabled = false
+    ZNX:Notify("Menu fechado. Pressione M para abrir.", "warn")
+end)
+
+local minimizeButton = makeButton("rbxassetid://7072719338", "Minimize")
+minimizeButton.Parent = HeaderBar
+minimizeButton.Position = UDim2.new(1, -60, 0, 16)
+minimizeButton.ZIndex = 10
+
+local originalWindow = {Size = Window.Size, Position = Window.Position}
+minimizeButton.MouseButton1Click:Connect(function()
+    ZNX.Minimized = not ZNX.Minimized
+    if ZNX.Minimized then
+        tween(Window, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 320, 0, 116)})
+        tween(Window, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, 0, 0.5, 0)})
+        ContentFrame.Visible = false
+        LeftPanel.Visible = false
+        ZNX:Notify("Janela minimizada. Clique novamente para restaurar.", "warn")
+    else
+        ContentFrame.Visible = true
+        LeftPanel.Visible = true
+        tween(Window, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalWindow.Size})
+        tween(Window, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = originalWindow.Position})
+        ZNX:Notify("Janela restaurada.", "success")
+    end
+end)
+
+local function createThemeButton(parent, label, preset)
     local btn = new("TextButton", {
         Parent = parent,
-        BackgroundColor3 = Theme.Panel,
+        Size = UDim2.new(1, 0, 0, 44),
+        BackgroundColor3 = ZNX.Theme.Pane,
+        BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
         BorderSizePixel = 0,
-        Size = UDim2.new(1, -28, 0, 46),
-        Text = text,
+        Text = label,
         Font = Enum.Font.GothamSemibold,
         TextSize = 14,
-        TextColor3 = Theme.SubText,
+        TextColor3 = ZNX.Theme.Text,
         AutoButtonColor = false,
     }, {
         new("UICorner", {CornerRadius = UDim.new(0, 16)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
     })
+    btn.MouseButton1Click:Connect(function()
+        setTheme(preset)
+    end)
     return btn
 end
 
-local navLayout = new("UIListLayout", {Parent = Nav, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)})
-new("UIPadding", {Parent = Nav, PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 18), PaddingTop = UDim.new(0, 18), PaddingBottom = UDim.new(0, 18)})
-
-local logo = new("TextLabel", {
-    Parent = Nav,
+local themeSection = new("Frame", {
+    Parent = settingsPage,
+    Size = UDim2.new(1, 0, 0, 160),
     BackgroundTransparency = 1,
-    Size = UDim2.new(1, 0, 0, 34),
-    Text = "ZNX X",
-    Font = Enum.Font.GothamBlack,
-    TextSize = 18,
-    TextColor3 = Theme.Text,
-    TextXAlignment = Enum.TextXAlignment.Left,
+}, {
+    new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)}),
 })
+createThemeButton(themeSection, "Orion", "Orion")
+createThemeButton(themeSection, "Glass", "Glass")
 
-local buttonNames = {"Dashboard", "Settings", "Player", "Defense", "Combat"}
-for _, name in ipairs(buttonNames) do
-    createNavButton(Nav, name)
+local function createNotifyButton(parent, label, value)
+    local btn = new("TextButton", {
+        Parent = parent,
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = ZNX.Theme.Pane,
+        BackgroundTransparency = ZNX.Theme.PaneTransparency or 0,
+        BorderSizePixel = 0,
+        Text = label,
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 13,
+        TextColor3 = ZNX.Theme.Text,
+        AutoButtonColor = false,
+    }, {
+        new("UICorner", {CornerRadius = UDim.new(0, 14)}),
+        new("UIStroke", {Color = ZNX.Theme.Border, Thickness = 1, Transparency = 0.75}),
+    })
+    btn.MouseButton1Click:Connect(function()
+        ZNX.NotifPos = value
+        saveConfig()
+        ZNX:Notify("Posição de notificação salva: " .. label, "success")
+    end)
+    return btn
 end
 
-addTab("Dashboard", function(page)
-    createCard("Vis�o geral", "Status do hub e desempenho em tempo real."):Parent(page)
-    createCard("Notifica��es", "Hist�rico r�pido de alertas e pacotes detectados."):Parent(page)
-end)
+local notifSection = new("Frame", {
+    Parent = settingsPage,
+    Size = UDim2.new(1, 0, 0, 192),
+    BackgroundTransparency = 1,
+}, {
+    new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)}),
+    new("UIPadding", {PaddingLeft = UDim.new(0, 0), PaddingRight = UDim.new(0, 0), PaddingTop = UDim.new(0, 0), PaddingBottom = UDim.new(0, 0)}),
+})
+new("TextLabel", {
+    Parent = notifSection,
+    Size = UDim2.new(1, 0, 0, 18),
+    BackgroundTransparency = 1,
+    Text = "Posição de notificação",
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+    TextColor3 = ZNX.Theme.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+createNotifyButton(notifSection, "BottomRight", "BottomRight")
+createNotifyButton(notifSection, "BottomLeft", "BottomLeft")
+createNotifyButton(notifSection, "TopRight", "TopRight")
+createNotifyButton(notifSection, "TopLeft", "TopLeft")
 
-addTab("Settings", function(page)
-    createCard("Configura��es visuais", "Escolha tema, posi��o de notifica��es e atalhos."):Parent(page)
-    createCard("Packet Shield", "Detector de pacotes sempre ativo com avisos instant�neos."):Parent(page)
-end)
-
-addTab("Player", function(page)
-    createCard("Movimento", "Ajuste velocidade e salto do personagem."):Parent(page)
-    createCard("A��es", "Controles r�pidos e bind de teclas."):Parent(page)
-end)
-
-addTab("Defense", function(page)
-    createCard("Escudo", "Prote��o contra danos e golpes inimigos."):Parent(page)
-    createCard("Auto-Defesa", "Respostas autom�ticas a eventos suspeitos."):Parent(page)
-end)
-
-addTab("Combat", function(page)
-    createCard("Grab Analyzer", "Monitoramento de grab e pacotes estranhos."):Parent(page)
-    createCard("Kill Switch", "A��es r�pidas para cancelar ataques inv�lidos."):Parent(page)
-end)
-
-local navButtons = Nav:GetChildren()
-local buttonIndex = 1
-for _, child in ipairs(navButtons) do
-    if child:IsA("TextButton") then
-        child.MouseButton1Click:Connect(function()
-            switchTab(child.Text)
-        end)
-        if buttonIndex == 1 then
-            child.BackgroundColor3 = Theme.Active
-            child.TextColor3 = Theme.Text
-        end
-        buttonIndex = buttonIndex + 1
-    end
+local function updateTime()
+    local time = os.date("*t")
+    StatusLabel.Text = string.format("%02d:%02d  �  %s", time.hour, time.min, ZNX.CurrentPreset)
 end
 
 RS.RenderStepped:Connect(function(dt)
-    local fps = math.floor(1 / math.max(dt, 1/120))
+    local fps = math.floor(1 / math.max(dt, 1 / 120))
     local ping = 0
     pcall(function()
         ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
     end)
-    local time = os.date("*t")
-    StatusText.Text = string.format("%d fps  |  %dms  |  %02d:%02d", fps, ping, time.hour, time.min)
+    updateTime()
+    ShieldLabel.Text = "Packet Shield: ATIVO"
 end)
 
 local dragInfo = {active = false, start = Vector2.new(), origin = Vector2.new()}
@@ -498,56 +849,16 @@ Window.InputEnded:Connect(function(input)
     end
 end)
 
-local function makeButton(iconId, x)
-    local btn = new("TextButton", {
-        Parent = Window,
-        Size = UDim2.new(0, 30, 0, 30),
-        Position = UDim2.new(1, -52 + x, 0, 18),
-        BackgroundColor3 = Theme.Panel,
-        BorderSizePixel = 0,
-        Text = "",
-        AutoButtonColor = false,
-    }, {
-        new("UICorner", {CornerRadius = UDim.new(0, 10)}),
-        new("UIStroke", {Color = Theme.Border, Thickness = 1, Transparency = 0.75}),
-        new("ImageLabel", {
-            Size = UDim2.new(0, 14, 0, 14),
-            Position = UDim2.new(0.5, -7, 0.5, -7),
-            BackgroundTransparency = 1,
-            Image = iconId,
-            ImageColor3 = Theme.SubText,
-        }),
-    })
-    return btn
-end
-
-local closeButton = makeButton("rbxassetid://7072725342", 0)
-closeButton.MouseButton1Click:Connect(function()
-    Root.Enabled = false
-    ZNX:Notify("Interface oculta. Pressione M para abrir.", "warn")
-end)
-
-local minimizeButton = makeButton("rbxassetid://7072719338", 32)
-minimizeButton.MouseButton1Click:Connect(function()
-    Content.Visible = not Content.Visible
-    StatusBar.Visible = Content.Visible
-    MonitorStatus.Visible = Content.Visible
-    if Content.Visible then
-        ZNX:Notify("Interface restaurada.", "success")
-    else
-        ZNX:Notify("Interface minimizada.", "warn")
-    end
-end)
-
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
     if input.KeyCode == Enum.KeyCode.M then
         Root.Enabled = not Root.Enabled
     end
 end)
 
+applyTheme()
 PacketMonitor:Start()
-ZNX:Notify("Nova vers�o visual carregada.", "success")
+ZNX:Notify("Interface Orion carregada.", "success")
 
 function ZNX:MakeWindow() end
 function ZNX:Init() end
